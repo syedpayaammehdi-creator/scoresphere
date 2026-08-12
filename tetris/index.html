@@ -381,7 +381,7 @@ const rRight=document.getElementById('royale-right');
 
 const rScoreEl=document.getElementById('r-score'),rAliveEl=document.getElementById('r-alive');
 const rLinesEl=document.getElementById('r-lines'),rLevelEl=document.getElementById('r-level');
-const rFlash=document.getElementById('r-rflash'),rCombo=document.getElementById('r-combo');
+const rFlash=document.getElementById('r-rflash'),rComboEl=document.getElementById('r-combo');
 const rBanner=document.getElementById('r-banner'),rGarbageAlert=document.getElementById('r-garbage-alert');
 
 // Royale state
@@ -465,7 +465,7 @@ function rSendBoard(){
 
 let rFlashTO,rComboTO,rBannerTO,rGarbTO;
 function rLineFlash(){rFlash.style.opacity='.3';if(rFlashTO)clearTimeout(rFlashTO);rFlashTO=setTimeout(()=>{rFlash.style.opacity='0';},70);}
-function rShowCombo(c){if(c<2)return;rCombo.textContent='×'+c+' COMBO!';rCombo.style.opacity='1';if(rComboTO)clearTimeout(rComboTO);rComboTO=setTimeout(()=>{rCombo.style.opacity='0';},900);}
+function rShowCombo(c){if(c<2)return;rComboEl.textContent='×'+c+' COMBO!';rComboEl.style.opacity='1';if(rComboTO)clearTimeout(rComboTO);rComboTO=setTimeout(()=>{rComboEl.style.opacity='0';},900);}
 function rShowBanner(txt,col){rBanner.textContent=txt;rBanner.style.color=col||'#0f8';rBanner.style.opacity='1';if(rBannerTO)clearTimeout(rBannerTO);rBannerTO=setTimeout(()=>{rBanner.style.opacity='0';},1400);}
 function rShowGarbage(){rGarbageAlert.style.opacity='1';if(rGarbTO)clearTimeout(rGarbTO);rGarbTO=setTimeout(()=>{rGarbageAlert.style.opacity='0';},1200);}
 
