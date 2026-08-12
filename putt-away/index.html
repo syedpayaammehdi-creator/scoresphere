@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Putt Away</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;overflow:hidden;font-family:'Barlow Condensed',Arial Narrow,Arial,sans-serif;}
+canvas{display:block;position:fixed;inset:0;z-index:0;}
+.screen{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.88);backdrop-filter:blur(8px);}
+.screen.hidden{display:none;}
+#home{background:rgba(0,8,0,.92);transition:background .35s;}
+#home-logo{font-size:clamp(54px,10vw,110px);font-weight:900;letter-spacing:6px;text-transform:uppercase;line-height:1;margin-bottom:8px;
+  background:linear-gradient(160deg,#aff5a0 0%,#2db82d 45%,#0a5c0a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;transition:background .3s;}
+.home-sub{font-size:14px;letter-spacing:5px;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:22px;}
+.mode-desc{font-size:12px;letter-spacing:3px;color:rgba(255,255,255,.25);margin-bottom:32px;text-transform:uppercase;}
+.btn{display:inline-block;padding:16px 52px;background:linear-gradient(135deg,#2db82d,#0a5c0a);border:none;border-radius:4px;color:#fff;font-size:20px;font-weight:900;letter-spacing:5px;text-transform:uppercase;font-family:'Barlow Condensed',sans-serif;cursor:pointer;clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%);transition:filter .18s,transform .15s;}
+.btn:hover{filter:brightness(1.3);transform:scale(1.03);}
+.btn-back{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);font-size:13px;padding:9px 28px;margin-top:16px;clip-path:none;border-radius:4px;letter-spacing:3px;}
+.home-scores{margin-top:28px;width:360px;}
+.home-scores h3{font-size:11px;letter-spacing:5px;color:rgba(255,255,255,.3);text-transform:uppercase;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:8px;}
+.score-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:15px;font-weight:600;}
+.score-row .sr-rank{color:#f5b800;width:28px;}
+.score-row .sr-val{color:#5bf55b;font-weight:900;}
+#hud{position:fixed;z-index:50;inset:0;pointer-events:none;}
+#hud-top{position:absolute;top:18px;left:50%;transform:translateX(-50%);display:flex;gap:16px;align-items:center;}
+.hud-pill{background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.12);border-radius:100px;padding:6px 16px;font-size:13px;font-weight:700;letter-spacing:2px;color:#fff;text-transform:uppercase;white-space:nowrap;}
+.hud-pill span{color:#5bf55b;}
+#hud-club{position:absolute;bottom:110px;left:28px;background:rgba(0,0,0,.7);border:1px solid rgba(80,220,80,.3);border-radius:6px;padding:10px 16px;min-width:180px;pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none;transition:border-color .15s,background .15s;}
+#hud-club:active{background:rgba(45,184,45,.15);border-color:rgba(91,245,91,.7);}
+#hud-club .cl-name{font-size:21px;font-weight:900;color:#5bf55b;letter-spacing:2px;}
+#hud-club .cl-range{font-size:11px;color:rgba(255,255,255,.4);letter-spacing:3px;margin-top:2px;}
+#hud-club .cl-tap{display:none;font-size:9px;letter-spacing:3px;color:rgba(91,245,91,.5);margin-top:3px;text-transform:uppercase;}
+#hud-club.tc-club .cl-tap{display:block;}
+#hud-club.tc-club .cl-name::before{content:'‹ ';opacity:.45;}
+#hud-club.tc-club .cl-name::after{content:' ›';opacity:.45;}
+#hud-dist{position:absolute;bottom:110px;right:28px;text-align:right;background:rgba(0,0,0,.7);border:1px solid rgba(80,220,80,.3);border-radius:6px;padding:10px 16px;}
+#hud-dist .dist-num{font-size:30px;font-weight:900;color:#fff;line-height:1;}
+#hud-dist .dist-lbl{font-size:11px;color:rgba(255,255,255,.4);letter-spacing:3px;}
+#hud-controls{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;}
+.ctrl-tag{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.1);border-radius:4px;padding:4px 10px;font-size:11px;letter-spacing:2px;color:rgba(255,255,255,.45);}
+.ctrl-tag b{color:#fff;}
+#hud-stroke{position:absolute;top:18px;right:28px;text-align:right;}
+.st-num{font-size:40px;font-weight:900;color:#fff;line-height:1;}
+.st-lbl{font-size:10px;letter-spacing:4px;color:rgba(255,255,255,.3);}
+#power-wrap{position:fixed;z-index:60;bottom:100px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;}
+#power-wrap.hidden{opacity:0;}
+#power-wrap.tc-power{bottom:240px;}
+#power-bar{width:260px;height:14px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);border-radius:100px;overflow:hidden;}
+#power-fill{height:100%;width:0%;border-radius:100px;background:linear-gradient(90deg,#2db82d,#f5b800,#e84e1b);}
+#power-pct{font-size:13px;font-weight:800;letter-spacing:3px;color:#fff;}
+#screen-hole{background:rgba(0,10,0,.93);}
+.hc-title{font-size:52px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#5bf55b;text-shadow:0 0 40px rgba(91,245,91,.5);margin-bottom:4px;}
+.hc-score{font-size:20px;font-weight:700;color:rgba(255,255,255,.55);margin-bottom:28px;}
+.hc-table{width:340px;margin-bottom:28px;}
+.hc-row{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px;}
+.hc-row.total{border-top:1px solid rgba(91,245,91,.3);margin-top:4px;font-weight:900;font-size:17px;color:#5bf55b;}
+#screen-over{background:rgba(0,0,0,.94);}
+.go-title{font-size:68px;font-weight:900;letter-spacing:6px;color:#f5b800;margin-bottom:8px;}
+.go-score{font-size:34px;font-weight:800;color:#fff;margin-bottom:6px;}
+.go-vs-par{font-size:18px;color:rgba(255,255,255,.5);margin-bottom:32px;}
+.go-hs-badge{background:rgba(245,184,0,.15);border:1px solid rgba(245,184,0,.4);border-radius:6px;padding:10px 22px;font-size:13px;font-weight:800;letter-spacing:4px;color:#f5b800;margin-bottom:28px;display:none;}
+#penalty-flash{position:fixed;inset:0;z-index:80;pointer-events:none;opacity:0;background:rgba(220,40,40,.45);transition:opacity .1s;}
+#back-btn{position:fixed;top:14px;left:16px;z-index:9999;
+  display:flex;align-items:center;gap:7px;
+  padding:7px 14px 7px 10px;
+  background:rgba(0,8,0,0.75);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:6px;
+  color:rgba(255,255,255,0.55);
+  font-family:'Barlow Condensed',Arial Narrow,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;
+  text-decoration:none;text-transform:uppercase;
+  backdrop-filter:blur(12px);
+  transition:color .15s,border-color .15s,background .15s;}
+#back-btn:hover{color:#fff;border-color:rgba(255,255,255,0.35);background:rgba(0,20,0,0.9);}
+#notify{position:fixed;top:76px;left:50%;transform:translateX(-50%);z-index:90;background:rgba(0,0,0,.82);border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:8px 24px;font-size:13px;font-weight:900;letter-spacing:3px;color:#fff;text-transform:uppercase;transition:opacity .3s;opacity:0;white-space:nowrap;pointer-events:none;}
+
+/* ── TOUCH CONTROLS ── */
+#touch-overlay{position:fixed;inset:0;z-index:55;display:none;pointer-events:none;}
+#touch-overlay.tc-active{display:block;}
+#touch-aim-zone{position:absolute;left:0;top:0;bottom:130px;width:62%;pointer-events:auto;}
+#touch-aim-hint{
+  position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+  font-size:9px;letter-spacing:2px;color:rgba(255,255,255,.3);text-transform:uppercase;
+  pointer-events:none;white-space:nowrap;
+}
+#touch-shoot-btn{
+  position:absolute;right:18px;bottom:18px;
+  width:96px;height:96px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,rgba(91,245,91,.4),rgba(10,92,10,.9));
+  border:3px solid rgba(91,245,91,.7);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:22px;font-weight:900;color:#fff;
+  pointer-events:auto;user-select:none;-webkit-user-select:none;
+  box-shadow:0 0 24px rgba(91,245,91,.3);
+  transition:transform .08s,background .1s;
+}
+#touch-shoot-btn .btn-lbl{font-size:8px;letter-spacing:3px;color:rgba(255,255,255,.6);font-weight:700;}
+#touch-shoot-btn.charging{
+  background:radial-gradient(circle at 40% 35%,rgba(245,184,0,.5),rgba(200,80,0,.9));
+  border-color:rgba(245,184,0,.9);transform:scale(1.08);
+}
+#touch-joy-base{
+  position:absolute;width:110px;height:110px;border-radius:50%;
+  background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.18);
+  display:none;transform:translate(-50%,-50%);pointer-events:none;
+}
+#touch-joy-knob{
+  position:absolute;width:50px;height:50px;border-radius:50%;
+  background:rgba(255,255,255,.3);border:2px solid rgba(255,255,255,.55);
+  display:none;transform:translate(-50%,-50%);pointer-events:none;
+}
+/* Desktop layout: ensure all HUD elements have room */
+@media(min-width:641px){
+  #hud-club{bottom:80px;}
+  #hud-dist{bottom:80px;}
+  #hud-controls{bottom:14px;}
+  #power-wrap{bottom:86px;}
+}
+</style>
+</head>
+<body>
+<div id="penalty-flash"></div>
+<div id="notify"></div>
+
+<!-- Touch controls (mobile only) -->
+<div id="touch-overlay">
+  <div id="touch-aim-zone">
+    <div id="touch-aim-hint">DRAG TO AIM</div>
+  </div>
+  <div id="touch-joy-base"></div>
+  <div id="touch-joy-knob"></div>
+  <div id="touch-shoot-btn"><span id="shoot-icon">▶</span><span class="btn-lbl">SHOOT</span></div>
+</div>
+
+<div id="home" class="screen">
+  <div id="home-logo">Putt Away</div>
+  <div class="home-sub">3D Golf Simulator</div>
+  <div class="mode-desc">7 Clubs · Random 9 from 18 Holes</div>
+  <button class="btn" id="btn-play" onclick="startGame()">▶ Play 9 Holes</button>
+  <button class="btn btn-back" onclick="window.location.href='/'">◀ ScoreSphere</button>
+  <div class="home-scores"><h3 id="hs-label">Best Scores (vs Par)</h3><div id="hi-list"></div></div>
+</div>
+
+<div id="hud" class="hidden">
+  <div id="hud-top">
+    <div class="hud-pill" id="pill-hole">Hole <span id="h-num">1</span>/9</div>
+    <div class="hud-pill" id="pill-name"><span id="h-name">—</span></div>
+    <div class="hud-pill" id="pill-par">Par <span id="h-par">3</span></div>
+  </div>
+  <div id="hud-stroke"><div class="st-num" id="h-strokes">0</div><div class="st-lbl">STROKES</div></div>
+  <div id="hud-club" onclick="if(gs==='aim'){clubIdx=(clubIdx+1)%CLUBS.length;updateHUD();}"><div class="cl-name" id="cl-name">Driver</div><div class="cl-range" id="cl-range">MAX 280 YD</div><div class="cl-tap">TAP TO CHANGE</div></div>
+  <div id="hud-dist"><div class="dist-num" id="h-dist">0</div><div class="dist-lbl">YDS TO PIN</div></div>
+  <div id="hud-controls">
+    <span class="ctrl-tag"><b>A/D</b> Aim</span>
+    <span class="ctrl-tag"><b>W/S</b> Elevation</span>
+    <span class="ctrl-tag"><b>C</b> Club</span>
+    <span class="ctrl-tag"><b>SPACE</b> Charge &amp; Shoot</span>
+    <span class="ctrl-tag" id="ctrl-r"><b>R</b> Respawn</span>
+  </div>
+</div>
+
+<div id="power-wrap" class="hidden">
+  <div id="power-pct">0%</div>
+  <div id="power-bar"><div id="power-fill"></div></div>
+</div>
+
+<div id="screen-hole" class="screen hidden">
+  <div class="hc-title" id="hc-title">Hole Complete!</div>
+  <div class="hc-score" id="hc-score"></div>
+  <div class="hc-table" id="hc-table"></div>
+  <button class="btn" id="hc-btn" onclick="nextHole()">Next Hole ▶</button>
+</div>
+
+<div id="screen-over" class="screen hidden">
+  <div class="go-title">Round Complete</div>
+  <div class="go-score" id="go-score"></div>
+  <div class="go-vs-par" id="go-vs-par"></div>
+  <div class="go-hs-badge" id="go-hs">🏆 NEW BEST SCORE!</div>
+  <button class="btn" id="go-again" onclick="window.location.reload()">Play Again</button>
+  <button class="btn btn-back" style="margin-top:12px" onclick="window.location.href='/'">◀ ScoreSphere</button>
+</div>
+
+<script>
+'use strict';
+
+// ── CONSTANTS ─────────────────────────────────────────────
+var G=-.006, BOUNCE=.28, BALL_R=.4, CAM_DIST=9, CAM_H=4.5, TRAJ_YARDS=5;
+
+// ── CLUBS ─────────────────────────────────────────────────
+var CLUBS=[
+  {name:'Driver',        loft:10, maxYd:280, dispersion:.03},
+  {name:'3-Wood',        loft:15, maxYd:240, dispersion:.04},
+  {name:'5-Iron',        loft:27, maxYd:185, dispersion:.06},
+  {name:'8-Iron',        loft:40, maxYd:140, dispersion:.08},
+  {name:'Pitching Wedge',loft:48, maxYd:105, dispersion:.09},
+  {name:'Sand Wedge',    loft:56, maxYd:75,  dispersion:.08},
+  {name:'Putter',        loft:2,  maxYd:28,  dispersion:.01},
+];
+CLUBS.forEach(function(c){ var L=c.loft*Math.PI/180; c.vMax=Math.sqrt(c.maxYd*Math.abs(G)/Math.sin(2*L)); });
+
+// ── STYLES (classic) ─────────────────────────────────────
+var STYLES={
+  parkland:{sky:0x87ceeb,fog:0x87ceeb,sunCol:0xfff5e0,hs:0x87ceeb,hg:0x2d6e2d,
+    rough:[.14,.34,.10],fairway:[.25,.52,.16],green:[.28,.70,.22],hS:4.2,hF:1.1,cliff:2.6,
+    trees:{s:'oak',n:110,clusters:4,uc:0x1a4a1a,c:[0x1a5c1a,0x2d7a2d,0x145014,0x3d8c3d],t:0x5c3d1e}},
+  autumn:{sky:0xd49060,fog:0xc47844,sunCol:0xff9944,hs:0xd49060,hg:0x4a3010,
+    rough:[.44,.28,.08],fairway:[.30,.40,.10],green:[.20,.50,.12],hS:5.2,hF:.95,cliff:3.0,
+    trees:{s:'oak',n:130,clusters:5,uc:0x3c2808,c:[0xcc4400,0xdd7000,0xaa2200,0xbb5500],t:0x4a2800}},
+  highland:{sky:0x7080a0,fog:0x50607a,sunCol:0xd0d8e8,hs:0x6070a0,hg:0x0a1e0a,
+    rough:[.06,.20,.05],fairway:[.12,.34,.09],green:[.16,.52,.14],hS:10.5,hF:.80,cliff:5.0,
+    trees:{s:'pine',n:140,clusters:6,uc:0x081a08,c:[0x0c2c0e,0x0e3410,0x0a2808,0x122a0c],t:0x2a1808}},
+  links:{sky:0xbacfde,fog:0x9ab5c8,sunCol:0xfff0d8,hs:0xb0c8dc,hg:0x7a6a30,
+    rough:[.60,.52,.24],fairway:[.30,.52,.16],green:[.24,.62,.18],hS:4.2,hF:1.5,cliff:3.2,
+    trees:{s:'sparse',n:20,clusters:1,uc:0x284818,c:[0x2c5c1c,0x3c6c28,0x20501a,0x487030],t:0x3c2a10}},
+  desert:{sky:0x5aacee,fog:0x70b8ee,sunCol:0xffdd88,hs:0x5aacee,hg:0xc8a840,
+    rough:[.74,.62,.28],fairway:[.26,.62,.20],green:[.22,.66,.20],hS:3.8,hF:.72,cliff:3.8,
+    trees:{s:'palm',n:36,clusters:2,uc:0x165010,c:[0x1a6614,0x228020,0x165010,0x1e7018],t:0x8a6030}},
+  tropical:{sky:0x22aaee,fog:0x33aadd,sunCol:0xfff088,hs:0x22aaee,hg:0x208820,
+    rough:[.18,.54,.10],fairway:[.24,.74,.14],green:[.18,.80,.16],hS:2.9,hF:.82,cliff:2.4,
+    trees:{s:'palm',n:85,clusters:4,uc:0x185510,c:[0x1a7818,0x22881e,0x186614,0x208020],t:0x7a5020}},
+  woodland:{sky:0x334a2a,fog:0x263820,sunCol:0xb8d8a0,hs:0x405a34,hg:0x0e1a08,
+    rough:[.08,.22,.06],fairway:[.12,.36,.10],green:[.16,.54,.14],hS:8.5,hF:1.15,cliff:4.5,
+    trees:{s:'pine',n:180,clusters:9,uc:0x061204,c:[0x082006,0x0c2a08,0x061c04,0x0e2a0a],t:0x1e1006}},
+  dusk:{sky:0xd05828,fog:0xb84820,sunCol:0xff7700,hs:0xd06030,hg:0x2a1a08,
+    rough:[.38,.24,.10],fairway:[.22,.34,.12],green:[.18,.42,.14],hS:4.8,hF:1.0,cliff:3.2,
+    trees:{s:'oak',n:95,clusters:4,uc:0x0c0602,c:[0x180a04,0x200c06,0x140804,0x1c0e06],t:0x100804}},
+  heathland:{sky:0x0e2a5c,fog:0x081e44,sunCol:0xc0c8e0,hs:0x1a3468,hg:0x2a1a3a,
+    rough:[.38,.18,.32],fairway:[.20,.38,.12],green:[.16,.50,.14],hS:6.0,hF:1.3,cliff:4.0,
+    trees:{s:'gorse',n:75,clusters:3,uc:0x3a2a0c,c:[0x887020,0x9a8810,0x786018,0x8a7a1c],t:0x4a3410}},
+};
+
+// ── 18-HOLE POOL ──────────────────────────────────────────
+var ALL_HOLES=[
+  {id:1,par:3,name:'The Opener',    len:165,fw:24,gr:{x:0,  z:-165},greenR:9, style:'parkland',bunkers:[{x:-14,z:-148,r:8},{x:16,z:-151,r:7}],water:null},
+  {id:2,par:3,name:'Golden Short',  len:140,fw:22,gr:{x:-10,z:-140},greenR:8, style:'autumn',  bunkers:[{x:-20,z:-125,r:7},{x:12,z:-128,r:6}],water:null},
+  {id:3,par:3,name:'Coastal Short', len:155,fw:20,gr:{x:0,  z:-155},greenR:8, style:'links',   bunkers:[{x:-11,z:-140,r:7},{x:13,z:-144,r:6}],water:null},
+  {id:4,par:3,name:'Lagoon Green',  len:145,fw:22,gr:{x:12, z:-145},greenR:9, style:'tropical', bunkers:[],water:{x1:-40,x2:-14,z1:-130,z2:-62}},
+  {id:5,par:3,name:'Sunset Short',  len:130,fw:20,gr:{x:0,  z:-130},greenR:8, style:'dusk',    bunkers:[{x:-10,z:-115,r:6},{x:12,z:-118,r:6}],water:null},
+  {id:6,par:3,name:'Sand Trap',     len:170,fw:22,gr:{x:10, z:-170},greenR:8, style:'desert',  bunkers:[{x:-12,z:-150,r:9},{x:22,z:-155,r:8}],water:null},
+  {id:7,par:4,name:'Oak Avenue',    len:355,fw:26,gr:{x:14, z:-355},greenR:10,style:'parkland', bunkers:[{x:24,z:-335,r:9},{x:-10,z:-180,r:7},{x:20,z:-180,r:6}],water:null},
+  {id:8,par:4,name:'Misty Ridge',   len:370,fw:24,gr:{x:-22,z:-370},greenR:10,style:'highland', bunkers:[{x:-32,z:-350,r:9},{x:8,z:-200,r:7}],water:null},
+  {id:9,par:4,name:'The Narrows',   len:340,fw:18,gr:{x:10, z:-340},greenR:9, style:'woodland', bunkers:[{x:20,z:-320,r:7},{x:-8,z:-180,r:6}],water:{x1:26,x2:52,z1:-260,z2:-200}},
+  {id:10,par:4,name:'Dusk Descent', len:385,fw:26,gr:{x:-14,z:-385},greenR:10,style:'dusk',     bunkers:[{x:-24,z:-365,r:10},{x:10,z:-235,r:8}],water:{x1:18,x2:44,z1:-305,z2:-245}},
+  {id:11,par:4,name:'Purple Moor',  len:395,fw:26,gr:{x:-18,z:-395},greenR:10,style:'heathland',bunkers:[{x:-28,z:-375,r:9},{x:10,z:-220,r:8}],water:null},
+  {id:12,par:4,name:'Autumn Sweep', len:310,fw:24,gr:{x:0,  z:-310},greenR:9, style:'autumn',  bunkers:[{x:-16,z:-290,r:8},{x:18,z:-288,r:7}],water:null},
+  {id:13,par:5,name:'Highland Eagle',len:490,fw:28,gr:{x:0, z:-490},greenR:11,style:'highland', bunkers:[{x:-18,z:-468,r:10}],water:{x1:-16,x2:6,z1:-285,z2:-235}},
+  {id:14,par:5,name:'Dunes Run',    len:500,fw:30,gr:{x:20, z:-500},greenR:11,style:'links',    bunkers:[{x:-14,z:-220,r:9},{x:30,z:-380,r:10},{x:30,z:-480,r:9}],water:null},
+  {id:15,par:5,name:'Desert Oasis', len:510,fw:28,gr:{x:15, z:-510},greenR:11,style:'desert',   bunkers:[{x:25,z:-490,r:10},{x:-15,z:-300,r:9}],water:{x1:-20,x2:0,z1:-420,z2:-360}},
+  {id:16,par:5,name:'Tropical Run', len:515,fw:30,gr:{x:22, z:-515},greenR:11,style:'tropical',  bunkers:[{x:32,z:-495,r:10},{x:-12,z:-495,r:8}],water:{x1:-22,x2:6,z1:-345,z2:-285}},
+  {id:17,par:5,name:'Dark Run',     len:480,fw:24,gr:{x:-16,z:-480},greenR:11,style:'woodland',  bunkers:[{x:-26,z:-458,r:10}],water:{x1:-10,x2:15,z1:-360,z2:-295}},
+  {id:18,par:5,name:'Heathland End',len:535,fw:30,gr:{x:0,  z:-535},greenR:12,style:'heathland', bunkers:[{x:-20,z:-512,r:11},{x:22,z:-508,r:10}],water:{x1:-12,x2:22,z1:-395,z2:-325}},
+];
+
+var HOLES=[];
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=0|Math.random()*(i+1);var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+
+// ── THREE.JS ─────────────────────────────────────────────
+var renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate=false; // only update when scene changes, not every frame
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+document.body.appendChild(renderer.domElement);
+
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87ceeb);
+scene.fog=new THREE.Fog(0x87ceeb,90,520);
+
+var camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,0.1,700);
+
+var sun=new THREE.DirectionalLight(0xfff6e0,1.6);
+sun.position.set(55,90,35); sun.castShadow=true;
+sun.shadow.mapSize.width=2048; sun.shadow.mapSize.height=2048;
+sun.shadow.camera.near=0.5; sun.shadow.camera.far=700;
+sun.shadow.camera.left=-180; sun.shadow.camera.right=180;
+sun.shadow.camera.top=180;   sun.shadow.camera.bottom=-180;
+sun.shadow.bias=-0.0003;
+scene.add(sun);
+var fillLight=new THREE.DirectionalLight(0xaaccff,0.35);
+fillLight.position.set(-40,30,-20); scene.add(fillLight);
+var hemi=new THREE.HemisphereLight(0x87ceeb,0x2d6e2d,0.55);
+scene.add(hemi);
+
+// ── CANVAS TEXTURES ──────────────────────────────────────
+function mkTex(w,h,fn){
+  var c=document.createElement('canvas');c.width=w;c.height=h;
+  fn(c.getContext('2d'),w,h);
+  var t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  return t;
+}
+// Grass bump: mow-stripe bands + dense blade strokes + soil patches
+var GRASS_BUMP=mkTex(512,512,function(ctx,w,h){
+  ctx.fillStyle='#7c7c7c';ctx.fillRect(0,0,w,h);
+  for(var y=0;y<h;y+=18){
+    ctx.fillStyle=(Math.floor(y/18)%2)?'rgba(115,115,115,0.13)':'rgba(55,55,55,0.10)';
+    ctx.fillRect(0,y,w,9);
+  }
+  for(var i=0;i<20000;i++){
+    var x=Math.random()*w,y=Math.random()*h;
+    var len=2+Math.random()*8,a=-Math.PI/2+(Math.random()-.5)*1.1;
+    var br=100+Math.floor(Math.random()*110);
+    ctx.strokeStyle='rgba('+br+','+br+','+br+',0.20)';
+    ctx.lineWidth=0.45+Math.random()*.7;
+    ctx.beginPath();ctx.moveTo(x,y);
+    ctx.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len);ctx.stroke();
+  }
+  for(var i=0;i<240;i++){
+    var x=Math.random()*w,y=Math.random()*h,r=2+Math.random()*9;
+    var br=48+Math.floor(Math.random()*28);
+    ctx.fillStyle='rgba('+br+',44,26,0.11)';
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  }
+});
+// Sand: sinusoidal wind ripples + granule dots
+var SAND_BUMP=mkTex(256,256,function(ctx,w,h){
+  ctx.fillStyle='#9e9470';ctx.fillRect(0,0,w,h);
+  for(var i=0;i<65;i++){
+    var y0=i*4.2+(Math.random()-.5)*2;
+    ctx.strokeStyle='rgba(70,56,22,0.22)';ctx.lineWidth=1.1+Math.random()*1.8;
+    ctx.beginPath();ctx.moveTo(0,y0);
+    for(var x=0;x<w;x+=10){ctx.lineTo(x+10,y0+Math.sin(x*.055)*7+(Math.random()-.5)*3);}
+    ctx.stroke();
+  }
+  for(var i=0;i<900;i++){
+    var x=Math.random()*w,y=Math.random()*h,r=0.4+Math.random()*1.4;
+    var br=125+Math.floor(Math.random()*90);
+    ctx.fillStyle='rgba('+br+','+(br-22)+','+(br-50)+',0.38)';
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  }
+});
+// Rock: large angular fracture cracks + fine grain + highlight ridges
+var ROCK_BUMP=mkTex(256,256,function(ctx,w,h){
+  ctx.fillStyle='#7a7a7a';ctx.fillRect(0,0,w,h);
+  for(var i=0;i<14;i++){
+    var x0=Math.random()*w,y0=Math.random()*h,a=Math.random()*Math.PI,len=28+Math.random()*90;
+    ctx.strokeStyle='rgba(25,20,14,0.42)';ctx.lineWidth=2+Math.random()*3.5;
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+Math.cos(a)*len,y0+Math.sin(a)*len);ctx.stroke();
+  }
+  for(var i=0;i<5000;i++){
+    var x=Math.random()*w,y=Math.random()*h,len=1+Math.random()*7;
+    var a=Math.random()*Math.PI,br=55+Math.floor(Math.random()*105);
+    ctx.strokeStyle='rgba('+br+','+br+','+br+',0.22)';ctx.lineWidth=0.7;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len);ctx.stroke();
+  }
+  for(var i=0;i<8;i++){
+    var x0=Math.random()*w,y0=Math.random()*h,a=Math.random()*Math.PI,len=18+Math.random()*55;
+    ctx.strokeStyle='rgba(205,195,168,0.22)';ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+Math.cos(a)*len,y0+Math.sin(a)*len);ctx.stroke();
+  }
+});
+// Bark: vertical grain streaks + horizontal crack interruptions
+var BARK_BUMP=mkTex(128,256,function(ctx,w,h){
+  ctx.fillStyle='#6e6050';ctx.fillRect(0,0,w,h);
+  for(var i=0;i<50;i++){
+    var x=Math.random()*w;
+    var dr=20+Math.floor(Math.random()*55),dg=12+Math.floor(Math.random()*30),db=5+Math.floor(Math.random()*18);
+    ctx.strokeStyle='rgba('+dr+','+dg+','+db+',0.38)';
+    ctx.lineWidth=1.4+Math.random()*2.8;
+    ctx.beginPath();ctx.moveTo(x,0);
+    for(var y=0;y<h;y+=10){x=Math.max(0,Math.min(w,x+(Math.random()-.5)*5));ctx.lineTo(x,y);}
+    ctx.stroke();
+  }
+  for(var i=0;i<22;i++){
+    var x=Math.random()*w;
+    ctx.strokeStyle='rgba(180,155,110,0.13)';ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.moveTo(x,0);
+    for(var y=0;y<h;y+=10){x=Math.max(0,Math.min(w,x+(Math.random()-.5)*4));ctx.lineTo(x,y);}
+    ctx.stroke();
+  }
+  for(var i=0;i<20;i++){
+    var y=Math.random()*h;
+    ctx.strokeStyle='rgba(18,12,4,0.30)';ctx.lineWidth=0.65+Math.random()*.85;
+    ctx.beginPath();ctx.moveTo(0,y);
+    for(var x=0;x<w;x+=7){ctx.lineTo(x+7,y+(Math.random()-.5)*3);}
+    ctx.stroke();
+  }
+});
+BARK_BUMP.repeat.set(2,4);
+// Golf ball dimple map: hexagonally-packed circular depressions
+var BALL_BUMP=mkTex(512,512,function(ctx,w,h){
+  ctx.fillStyle='#888888';ctx.fillRect(0,0,w,h);
+  var sp=25, dr=10;
+  for(var row=-1;row<Math.ceil(h/(sp*.866))+2;row++){
+    for(var col=-1;col<Math.ceil(w/sp)+2;col++){
+      var x=col*sp+(row%2?sp*.5:0), y=row*sp*.866;
+      var grd=ctx.createRadialGradient(x,y,1,x,y,dr);
+      grd.addColorStop(0,'rgba(30,30,30,0.78)');
+      grd.addColorStop(.55,'rgba(88,88,88,0.45)');
+      grd.addColorStop(1,'rgba(148,148,148,0)');
+      ctx.fillStyle=grd;
+      ctx.beginPath();ctx.arc(x,y,dr,0,Math.PI*2);ctx.fill();
+    }
+  }
+});
+// Leaf canopy bump: dense overlapping short strokes
+var LEAF_BUMP=mkTex(256,256,function(ctx,w,h){
+  ctx.fillStyle='#787878';ctx.fillRect(0,0,w,h);
+  for(var i=0;i<9000;i++){
+    var x=Math.random()*w,y=Math.random()*h,a=Math.random()*Math.PI*2,len=1.5+Math.random()*6.5;
+    var br=50+Math.floor(Math.random()*90);
+    ctx.strokeStyle='rgba('+br+','+br+','+br+',0.28)';
+    ctx.lineWidth=0.5+Math.random()*.55;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len);ctx.stroke();
+  }
+  for(var i=0;i<90;i++){
+    var x=Math.random()*w,y=Math.random()*h,r=2.5+Math.random()*7;
+    ctx.fillStyle='rgba(38,38,38,0.09)';
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  }
+});
+// Water ripple bump: layered sine-wave interference
+var WATER_BUMP=mkTex(256,256,function(ctx,w,h){
+  ctx.fillStyle='#808080';ctx.fillRect(0,0,w,h);
+  for(var y=0;y<h;y+=2){
+    for(var x=0;x<w;x+=2){
+      var v=(Math.sin(x*.115+y*.075)*.5+.5)*.6+(Math.sin(x*.07-y*.13)*.5+.5)*.4;
+      var br=Math.floor(48+v*104);
+      ctx.fillStyle='rgba('+br+','+br+','+br+',0.55)';
+      ctx.fillRect(x,y,2,2);
+    }
+  }
+});
+WATER_BUMP.repeat.set(5,5);
+
+// ── SKY DOME ─────────────────────────────────────────────
+function buildSkyDome(sty){
+  var old=scene.getObjectByName('_sky');if(old)scene.remove(old);
+  var geo=new THREE.SphereGeometry(490,32,22);
+  var pos=geo.attributes.position, cols=[];
+  var skyR=(sty.sky>>16&255)/255,skyG=(sty.sky>>8&255)/255,skyB=(sty.sky&255)/255;
+  for(var vi=0;vi<pos.count;vi++){
+    var yy=pos.getY(vi);
+    var t=Math.pow(Math.max(0,Math.min(1,(yy+60)/550)),0.55);
+    var haze=Math.max(0,1-t*2.2)*0.28;
+    cols.push(Math.min(1,skyR*(1-t*.45)+haze),Math.min(1,skyG*(1-t*.25)+haze),Math.min(1,skyB*(1-t*.05)+haze));
+  }
+  geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(cols),3));
+  var dome=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide,fog:false,depthWrite:false}));
+  dome.name='_sky';
+  // Clouds for bright-sky styles
+  var lum=(sty.sky>>16&255)*0.299+(sty.sky>>8&255)*0.587+(sty.sky&255)*0.114;
+  if(lum>80){
+    var cRng=mulberry32((sty.sky^0xdeadbeef)>>>0);
+    var cMat=new THREE.MeshBasicMaterial({color:0xfefefe,transparent:true,opacity:.72,fog:false,depthWrite:false});
+    for(var ci=0;ci<9;ci++){
+      var cg=new THREE.Group();
+      var cx=(cRng()-.5)*700,cz=(cRng()-.5)*700,cy=120+cRng()*180;
+      for(var cb=0;cb<5+Math.floor(cRng()*6);cb++){
+        var cr=12+cRng()*28;
+        var csph=new THREE.Mesh(new THREE.SphereGeometry(cr,14,10),cMat);
+        csph.position.set((cRng()-.5)*cr*2.5,(cRng()-.5)*cr*.32,(cRng()-.5)*cr*1.6);
+        csph.scale.y=0.22+cRng()*.28;
+        csph.scale.x=1.0+cRng()*.3;
+        csph.rotation.y=cRng()*Math.PI;cg.add(csph);
+      }
+      cg.position.set(cx,cy,cz);dome.add(cg);
+    }
+  }
+  scene.add(dome);
+}
+
+function hexTint(hex,amt){
+  var r=((hex>>16)&255)/255,g=((hex>>8)&255)/255,b=(hex&255)/255;
+  return (Math.min(1,r+amt)*255|0)<<16|(Math.min(1,g+amt)*255|0)<<8|(Math.min(1,b+amt)*255|0);
+}
+
+// ── STATE ────────────────────────────────────────────────
+var gs='home', holeIdx=0, strokes=0, scores=[], clubIdx=0;
+var aimYaw=0, aimPitch=0, chargeT=0, chargeAmt=0;
+var ballVel=new THREE.Vector3(), ballOnGround=false;
+var terrainData=null, pinPos=new THREE.Vector3();
+var ballMesh, trajectoryLine;
+var waterMeshRef=null; // cached to avoid scene.getObjectByName every frame
+var notifyTO;
+
+// ── NOTIFY ───────────────────────────────────────────────
+function showNotify(msg,col){
+  var el=document.getElementById('notify');
+  el.textContent=msg; el.style.color=col||'#fff'; el.style.opacity='1';
+  clearTimeout(notifyTO); notifyTO=setTimeout(function(){el.style.opacity='0';},1800);
+}
+
+// ── NOISE / HELPERS ───────────────────────────────────────
+function noise2(x,z,freq,scale){
+  freq=freq||1; scale=scale||1;
+  return(Math.sin(x*.055*freq+1.1)*Math.cos(z*.042*freq)*2.8
+       + Math.sin(x*.022*freq+z*.031*freq+.7)*4.2
+       + Math.cos(x*.09*freq-z*.07*freq+.3)*1.4)*scale;
+}
+// 4-octave fractional Brownian Motion for richly detailed, multi-scale terrain
+function fbm(x,z,freq,scale){
+  var h=0,amp=scale,f=freq;
+  h+=noise2(x,z,f,amp); amp*=0.50; f*=2.03;
+  h+=noise2(x,z,f,amp); amp*=0.50; f*=2.07;
+  h+=noise2(x,z,f,amp); amp*=0.50; f*=2.11;
+  h+=noise2(x,z,f,amp);
+  return h;
+}
+function getFwCX(wz,hole){var t=wz/hole.gr.z;return hole.gr.x*t*t;}
+
+function getH(wx,wz){
+  if(!terrainData) return 0;
+  var td=terrainData;
+  var gi=(wx-td.minX)/td.cellX, gj=(wz-td.minZ)/td.cellZ;
+  var ii=Math.max(0,Math.min(td.vW-2,0|gi)), jj=Math.max(0,Math.min(td.vH-2,0|gj));
+  var fx=gi-ii, fz=gj-jj;
+  return td.hmap[jj*td.vW+ii]*(1-fx)*(1-fz)
+       + td.hmap[jj*td.vW+ii+1]*fx*(1-fz)
+       + td.hmap[(jj+1)*td.vW+ii]*(1-fx)*fz
+       + td.hmap[(jj+1)*td.vW+ii+1]*fx*fz;
+}
+
+// ── BUILD CLASSIC HOLE ────────────────────────────────────
+function buildHole(hole){
+  ['_terrain','_trees','_water','_flag','_ball','_traj','_tee'].forEach(function(n){
+    var o=scene.getObjectByName(n); if(o) scene.remove(o);
+  });
+  terrainData=null;
+  var sty=STYLES[hole.style]||STYLES.parkland;
+  sun.color.setHex(sty.sunCol||0xfff5e0);
+  hemi.color.setHex(sty.hs||sty.sky);
+  hemi.groundColor.setHex(sty.hg||0x2d6e2d);
+  buildSkyDome(sty);
+  scene.background.setHex(sty.sky);
+  scene.fog.color.setHex(hexTint(sty.fog,0.12));
+  scene.fog.near=90; scene.fog.far=Math.min(540,hole.len+160);
+
+  var TW=130, TH=hole.len+90;
+  var SW=100, SH=Math.min(260,Math.ceil(TH/2.2));
+  var geom=new THREE.PlaneGeometry(TW,TH,SW,SH);
+  geom.rotateX(-Math.PI/2);
+  geom.translate(0,0,-(TH/2-45));
+
+  var pos=geom.attributes.position;
+  var vW=SW+1, vH=SH+1;
+  var hmap=new Float32Array(vW*vH);
+  var minX=-TW/2, minZ=-(TH-45);
+  var cellX=TW/SW, cellZ=TH/SH;
+  var WALL_START=22, WALL_RAMP=14;
+  var cliffFactor=sty.cliff||0.5;
+
+  // Per-hole procedural terrain features — cliffs, ravines, ridges, mesas, pits
+  var hRng=mulberry32(hole.id*13337+42);
+  var numFeat=8+(hole.par-3)*7; // par3=8, par4=15, par5=22
+  var features=[];
+  for(var fi=0;fi<numFeat;fi++){
+    var fkind=hRng();
+    var fside=hRng()>.5?1:-1;
+    features.push({
+      z:-45-hRng()*Math.max(0,hole.len-80),
+      side:fside,
+      kind:fkind<.25?'cliff':fkind<.48?'ravine':fkind<.60?'ridge':fkind<.74?'mesa':fkind<.88?'knoll':'cave',
+      height:(65+hRng()*110)*cliffFactor,
+      span:55+hRng()*120,
+      width:12+hRng()*26  // for ridge, mesa, knoll
+    });
+  }
+
+  // PASS 1: compute all heights
+  for(var j=0;j<vH;j++){
+    for(var i=0;i<vW;i++){
+      var vi=j*vW+i;
+      var wx=minX+i*cellX, wz=minZ+j*cellZ;
+      var fcx=getFwCX(wz,hole);
+      var dfw=Math.abs(wx-fcx);
+      var fBlend=Math.max(0,1-dfw/(hole.fw*.52));
+      var dgr=Math.sqrt((wx-hole.gr.x)*(wx-hole.gr.x)+(wz-hole.gr.z)*(wz-hole.gr.z));
+      var gBlend=Math.max(0,1-dgr/(hole.greenR+3));
+      // Base terrain — 4-octave fBm for rich multi-scale detail
+      var h=fbm(wx,wz,sty.hF,sty.hS*(1+cliffFactor*1.6)*.78);
+      h*=(1-fBlend*.96);
+      h*=(1-gBlend*0.78); // greens keep 22% of natural slope — ball rolls on tilted greens
+      if(wz>-12&&dfw<15) h*=.08;
+      // Boundary walls — very steep to frame the course
+      var wallX=Math.max(0,(Math.abs(wx)-(TW/2-WALL_START))/WALL_RAMP);
+      var wallZn=Math.max(0,(wz-18)/WALL_RAMP);
+      var wallZf=Math.max(0,(-wz-(hole.len+38))/WALL_RAMP);
+      var wall=Math.max(wallX,wallZn,wallZf);
+      h+=wall*wall*wall*350;
+      // Bunker depressions
+      hole.bunkers.forEach(function(bk){
+        var bd=Math.sqrt((wx-bk.x)*(wx-bk.x)+(wz-bk.z)*(wz-bk.z));
+        if(bd<bk.r){var bf=Math.pow(1-bd/bk.r,1.5)*3.2;h-=bf*(1-gBlend);}
+      });
+      // Green mound
+      if(dgr<hole.greenR+6){
+        var gMound=Math.max(0,1-(dgr/(hole.greenR+6)))*1.8;
+        h+=gMound*(1-gBlend);
+      }
+      // Procedural terrain features
+      for(var fi2=0;fi2<features.length;fi2++){
+        var ft=features[fi2];
+        var dz=Math.abs(wz-ft.z);
+        if(dz>ft.span) continue;
+        var zF=Math.pow(Math.cos(dz/ft.span*Math.PI*0.5),0.7); // sharper bell
+        var fcxF=getFwCX(ft.z,hole);
+        var edgeX=fcxF+ft.side*hole.fw*0.45;
+        var distFromEdge=(wx-edgeX)*ft.side;
+        var ffBlend=Math.max(0,1-Math.abs(wx-fcx)/(hole.fw*.42));
+        if(ft.kind==='cliff'){
+          if(distFromEdge>-4){
+            // Vertical escarpment — steep sigmoid, reaches to fairway shoulder
+            var sig=1/(1+Math.exp(-6.0*(distFromEdge-3)));
+            h+=sig*ft.height*zF*(1-ffBlend*.55);
+          }
+        } else if(ft.kind==='ravine'){
+          if(distFromEdge>-2){
+            // Sharp canyon — deep cut, near-vertical walls
+            var rv=1-1/(1+Math.exp(5.0*(distFromEdge-3)));
+            h-=rv*ft.height*1.05*zF*(1-ffBlend*.60);
+          }
+        } else if(ft.kind==='ridge'){
+          // Narrow elevated spine running across the terrain
+          var ridgeDist=Math.abs(distFromEdge-ft.width);
+          if(ridgeDist<ft.width){
+            var rF=1-ridgeDist/ft.width;
+            h+=rF*rF*ft.height*0.95*zF*(1-ffBlend*.58);
+          }
+        } else if(ft.kind==='mesa'){
+          // Flat-topped plateau: steep sides, flat cap
+          var mDist=distFromEdge-3;
+          if(mDist>-4&&mDist<ft.width){
+            var mRise=mDist<0?1/(1+Math.exp(5.5*(mDist+2))):mDist<ft.width-4?1.0:1-Math.min(1,(mDist-(ft.width-4))/4);
+            h+=mRise*ft.height*0.88*zF*(1-ffBlend*.62);
+          }
+        } else if(ft.kind==='knoll'){
+          var knollCX=edgeX+ft.side*ft.width*.5;
+          var kDist=Math.sqrt((wx-knollCX)*(wx-knollCX)+(wz-ft.z)*(wz-ft.z));
+          var kR=ft.width*.9+10;
+          if(kDist<kR){
+            var kF=Math.pow(Math.max(0,1-kDist/kR),1.6);
+            h+=kF*ft.height*0.45*zF*(1-ffBlend*.78);
+          }
+        } else { // cave pit
+          var pitCX=edgeX+ft.side*10;
+          var pitDist=Math.sqrt((wx-pitCX)*(wx-pitCX)+(wz-ft.z)*(wz-ft.z));
+          if(pitDist<22){
+            var pF=Math.max(0,1-pitDist/18);
+            h-=pF*pF*30*zF*(1-ffBlend*0.55);
+          }
+        }
+      }
+      hmap[vi]=h; pos.setY(vi,h);
+    }
+  }
+
+  // PASS 2: vertex colors with slope, mowing stripes, subtle noise
+  var cols=[];
+  var nzV=noise2(0,0,3.5,.015); // offset to make per-hole noise slightly different
+  for(var j=0;j<vH;j++){
+    for(var i=0;i<vW;i++){
+      var vi=j*vW+i;
+      var wx=minX+i*cellX, wz=minZ+j*cellZ;
+      var h=hmap[vi];
+      var fcx=getFwCX(wz,hole);
+      var dfw=Math.abs(wx-fcx);
+      var fBlend=Math.max(0,1-dfw/(hole.fw*.52));
+      var dgr=Math.sqrt((wx-hole.gr.x)*(wx-hole.gr.x)+(wz-hole.gr.z)*(wz-hole.gr.z));
+      var wallX=Math.max(0,(Math.abs(wx)-(TW/2-WALL_START))/WALL_RAMP);
+      var wallZn=Math.max(0,(wz-18)/WALL_RAMP);
+      var wallZf=Math.max(0,(-wz-(hole.len+38))/WALL_RAMP);
+      var wall=Math.max(wallX,wallZn,wallZf);
+      // Slope for cliff face / rock detection
+      var hL=i>0?hmap[j*vW+(i-1)]:h;
+      var hR=i<vW-1?hmap[j*vW+(i+1)]:h;
+      var hU=j>0?hmap[(j-1)*vW+i]:h;
+      var hD=j<vH-1?hmap[(j+1)*vW+i]:h;
+      var slope=Math.sqrt((hR-hL)*(hR-hL)+(hD-hU)*(hD-hU))/(2*Math.max(cellX,cellZ));
+      var isRock=slope>1.15&&wall<0.4;
+      var isCave=h<-5&&!isRock&&wall<0.3;
+      var inB=hole.bunkers.some(function(bk){return Math.sqrt((wx-bk.x)*(wx-bk.x)+(wz-bk.z)*(wz-bk.z))<bk.r;});
+      var inW=hole.water&&wx>=hole.water.x1&&wx<=hole.water.x2&&wz>=hole.water.z1&&wz<=hole.water.z2;
+      // Subtle per-vertex color micro-variation (breaks uniformity)
+      var vn=noise2(wx*2.8+hole.id*3.7,wz*2.8,1,0.018);
+      var r,g,b;
+      if(wall>.3){
+        var wf=Math.min(1,wall);r=.50-wf*.14+vn;g=.44-wf*.13+vn*.6;b=.34-wf*.10+vn*.4;
+      } else if(inW){r=.08+vn*.02;g=.28+vn*.04;b=.60+vn*.02;}
+      else if(inB){
+        // Sand bunker — warm tan with slight variation
+        var sv=noise2(wx*4,wz*4,1,.012);
+        r=.76+sv;g=.66+sv*.8;b=.40+sv*.6;
+      } else if(isCave){
+        var dep=Math.min(1,(-h-5)/14);r=.12-dep*.09+vn*.03;g=.10-dep*.07+vn*.02;b=.08-dep*.06;
+      } else if(isRock){
+        // Stratified rock: lighter at altitude, darker in shadow
+        var rl=Math.min(1,Math.max(0,(h+5)/28));
+        r=.42+rl*.10+vn*.04;g=.36+rl*.08+vn*.03;b=.26+rl*.07+vn*.03;
+      } else if(dgr<hole.greenR){
+        // Putting green — slightly blue-green, uniform
+        var gv=noise2(wx*5,wz*5,1,.006);
+        r=sty.green[0]+gv;g=sty.green[1]+gv*.8;b=sty.green[2]+gv*.5;
+      } else if(fBlend>.5){
+        // Fairway with mowing stripes (alternating rows every 8 units)
+        var stripe=(Math.floor(Math.abs(wz)/8)%2)*0.048;
+        r=sty.fairway[0]+stripe*.7+vn*.5;
+        g=sty.fairway[1]+stripe+vn*.8;
+        b=sty.fairway[2]+stripe*.5+vn*.4;
+      } else {
+        // Rough — more texture variation
+        var rv=noise2(wx*1.8,wz*1.8,1,.022);
+        r=sty.rough[0]+rv+vn*.4;g=sty.rough[1]+rv*.9+vn*.6;b=sty.rough[2]+rv*.5+vn*.3;
+      }
+      cols.push(Math.max(0,Math.min(1,r)),Math.max(0,Math.min(1,g)),Math.max(0,Math.min(1,b)));
+    }
+  }
+  geom.setAttribute('color',new THREE.BufferAttribute(new Float32Array(cols),3));
+  geom.computeVertexNormals();
+  // PBR material with bump map for grass surface detail
+  GRASS_BUMP.repeat.set(TW/3,TH/3);
+  var terrMat=new THREE.MeshStandardMaterial({
+    vertexColors:true,roughness:.90,metalness:0,
+    bumpMap:GRASS_BUMP,bumpScale:.55
+  });
+  var mesh=new THREE.Mesh(geom,terrMat);
+  mesh.name='_terrain'; mesh.receiveShadow=true; mesh.castShadow=false; scene.add(mesh);
+  terrainData={hmap,vW,vH,TW,TH,minX,minZ,cellX,cellZ};
+
+  if(hole.water){
+    var w=hole.water;
+    var wGeo=new THREE.PlaneGeometry(w.x2-w.x1,w.z1-w.z2,28,28);
+    wGeo.rotateX(-Math.PI/2);
+    var wMat=new THREE.MeshStandardMaterial({
+      color:0x0c5099,roughness:.03,metalness:.42,
+      transparent:true,opacity:.84,
+      bumpMap:WATER_BUMP,bumpScale:.10
+    });
+    var wm=new THREE.Mesh(wGeo,wMat);
+    wm.position.set((w.x1+w.x2)/2,-.20,(w.z1+w.z2)/2);
+    wm.name='_water'; scene.add(wm); waterMeshRef=wm;
+  } else { waterMeshRef=null; }
+  buildTrees(hole,sty,TW);
+  // Tee box — grass pad with white tee markers
+  var teeH=getH(0,0);
+  var teeG=new THREE.Group(); teeG.name='_tee';
+  var teePad=new THREE.Mesh(new THREE.BoxGeometry(5.5,.10,3.5),
+    new THREE.MeshStandardMaterial({color:0x35b535,roughness:.82,metalness:0,bumpMap:GRASS_BUMP,bumpScale:.22}));
+  teePad.position.set(0,teeH+.045,-1); teeG.add(teePad);
+  [-2.1,2.1].forEach(function(x){
+    var tMat=new THREE.MeshStandardMaterial({color:0xeef0f5,roughness:.26,metalness:.18});
+    var post=new THREE.Mesh(new THREE.CylinderGeometry(.085,.13,.54,12),tMat);
+    post.position.set(x,teeH+.27,-1); teeG.add(post);
+    var cap=new THREE.Mesh(new THREE.SphereGeometry(.11,12,9,0,Math.PI*2,0,Math.PI*.5),tMat);
+    cap.position.set(x,teeH+.55,-1); teeG.add(cap);
+  });
+  scene.add(teeG);
+  makePinFlag(hole);
+}
+
+// Orient a cylinder mesh from point A to point B (A and B are {x,y,z})
+function _branchBetween(ax,ay,az,bx,by,bz,rBot,rTop,mat,tg){
+  var dx=bx-ax,dy=by-ay,dz=bz-az;
+  var len=Math.sqrt(dx*dx+dy*dy+dz*dz); if(len<.05) return;
+  var geo=new THREE.CylinderGeometry(rTop,rBot,len,8);
+  var mesh=new THREE.Mesh(geo,mat);
+  var dir=new THREE.Vector3(dx,dy,dz).normalize();
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
+  mesh.position.set((ax+bx)/2,(ay+by)/2,(az+bz)/2);
+  mesh.castShadow=true; tg.add(mesh);
+}
+
+function _buildOneTree(tg,tx,ty,tz,td,rng,trunkMat,side){
+  var lc=td.c[0|rng()*td.c.length];
+  var lm=new THREE.MeshStandardMaterial({color:lc,roughness:.80,metalness:0,bumpMap:LEAF_BUMP,bumpScale:.25});
+  var lm2=new THREE.MeshStandardMaterial({color:hexTint(lc,-0x0c0c0c),roughness:.78,metalness:0,bumpMap:LEAF_BUMP,bumpScale:.25});
+  if(td.s==='pine'){
+    var ph=8+rng()*13, numT=4+Math.floor(rng()*2);
+    var tr=new THREE.Mesh(new THREE.CylinderGeometry(.10,.34,ph*.58,10),trunkMat);
+    tr.position.set(tx,ty+ph*.29,tz); tr.castShadow=true; tg.add(tr);
+    var rf=new THREE.Mesh(new THREE.CylinderGeometry(.32,.55,ph*.10,10),trunkMat);
+    rf.position.set(tx,ty+ph*.05,tz); rf.castShadow=true; tg.add(rf);
+    for(var ti=0;ti<numT;ti++){
+      var tFrac=ti/numT;
+      var tY=ty+ph*(0.24+tFrac*.58);
+      var tR=(2.8-tFrac*1.6)*(0.88+rng()*.24);
+      var tH=ph*(0.44-tFrac*.05);
+      var tc=new THREE.Mesh(new THREE.ConeGeometry(tR,tH,11),ti%2?lm:lm2);
+      tc.position.set(tx,tY+tH*.35,tz); tc.castShadow=true; tg.add(tc);
+      if(ti<numT-1){
+        var lp=new THREE.Mesh(new THREE.CylinderGeometry(tR*.88,tR*.95,.07,11),lm);
+        lp.position.set(tx,tY+tH*.6,tz); lp.castShadow=true; tg.add(lp);
+      }
+    }
+    var ts=new THREE.Mesh(new THREE.ConeGeometry(.30,ph*.26,9),lm);
+    ts.position.set(tx,ty+ph*.90,tz); ts.castShadow=true; tg.add(ts);
+  } else if(td.s==='palm'){
+    var ph=10+rng()*11, lean=(rng()-.5)*.26;
+    var tr=new THREE.Mesh(new THREE.CylinderGeometry(.09,.24,ph,10),trunkMat);
+    tr.rotation.z=lean; tr.position.set(tx,ty+ph/2,tz); tr.castShadow=true; tg.add(tr);
+    for(var si=0;si<5;si++){
+      var sy=ty+ph*(0.15+si*.16);
+      var sr2=new THREE.Mesh(new THREE.CylinderGeometry(.15+si*.008,.18+si*.006,.05,10),trunkMat);
+      sr2.position.set(tx,sy,tz); tg.add(sr2);
+    }
+    var topX=tx+Math.sin(lean)*ph*.5, topY=ty+ph;
+    var fAngles=[0,Math.PI/3,2*Math.PI/3,Math.PI,4*Math.PI/3,5*Math.PI/3];
+    fAngles.forEach(function(fa){
+      var fr=2.0+rng()*.9;
+      var fx=topX+Math.cos(fa)*fr, fz=tz+Math.sin(fa)*fr;
+      var fDropY=topY-fr*.55;
+      var fm=new THREE.Mesh(new THREE.SphereGeometry(fr,9,6),lm);
+      fm.scale.y=.14+rng()*.08; fm.scale.x=1.2+rng()*.25;
+      fm.rotation.y=fa;
+      fm.position.set(fx,fDropY,fz); fm.castShadow=true; tg.add(fm);
+    });
+    var fc=new THREE.Mesh(new THREE.SphereGeometry(1.0+rng()*.4,10,7),lm);
+    fc.position.set(topX,topY+.4,tz); fc.castShadow=true; tg.add(fc);
+  } else if(td.s==='sparse'){
+    var ph=4+rng()*7, cr=1.8+rng()*2.0;
+    var tr=new THREE.Mesh(new THREE.CylinderGeometry(.15,.32,ph,9),trunkMat);
+    tr.position.set(tx,ty+ph/2,tz); tr.castShadow=true; tg.add(tr);
+    [-.38,.38].forEach(function(lean){
+      _branchBetween(tx,ty+ph*.75,tz, tx+lean*cr*.7,ty+ph+cr*.6+rng()*.5,tz+(rng()-.5)*cr*.5, .07,.04,trunkMat,tg);
+    });
+    [[0,0,0],[cr*.48*side,cr*.18,cr*.28],[cr*.32*-side,cr*.3,-cr*.22]].forEach(function(o,oi){
+      var sr=cr*(.72+rng()*.38);
+      var s=new THREE.Mesh(new THREE.SphereGeometry(sr,10,7),oi===0?lm:lm2);
+      s.position.set(tx+o[0],ty+ph+cr*.5+o[1],tz+o[2]);
+      s.castShadow=true; tg.add(s);
+    });
+  } else if(td.s==='gorse'){
+    var br=1.8+rng()*2.0;
+    var lumps=3+Math.floor(rng()*3);
+    for(var li=0;li<lumps;li++){
+      var lx=tx+(rng()-.5)*br*1.5, lz=tz+(rng()-.5)*br*1.5, lr=br*(.5+rng()*.42);
+      var bs=new THREE.Mesh(new THREE.SphereGeometry(lr,10,7),lm);
+      bs.scale.y=.38+rng()*.20;
+      bs.position.set(lx,ty+lr*.28,lz); bs.castShadow=true; tg.add(bs);
+    }
+    var st=new THREE.Mesh(new THREE.CylinderGeometry(.05,.12,br*.5,6),trunkMat);
+    st.position.set(tx,ty+br*.25,tz); tg.add(st);
+  } else {
+    var ph=5+rng()*9, cr=3.0+rng()*3.2;
+    var trR=.55+cr*.06, trRt=.28+cr*.04;
+    var tr=new THREE.Mesh(new THREE.CylinderGeometry(trRt,trR,ph,12),trunkMat);
+    tr.position.set(tx,ty+ph/2,tz); tr.castShadow=true; tg.add(tr);
+    var rf=new THREE.Mesh(new THREE.CylinderGeometry(trR*1.05,trR*1.45,ph*.18,12),trunkMat);
+    rf.position.set(tx,ty+ph*.09,tz); rf.castShadow=true; tg.add(rf);
+    var forkY=ty+ph*.78;
+    var nBranch=2+Math.floor(rng()*3);
+    for(var bi=0;bi<nBranch;bi++){
+      var ba=rng()*Math.PI*2;
+      var bDist=cr*.55+rng()*cr*.38;
+      var bx=tx+Math.cos(ba)*bDist*.85, bz=tz+Math.sin(ba)*bDist*.85;
+      var bY=forkY+cr*.3+rng()*cr*.25;
+      _branchBetween(tx,forkY,tz, bx,bY,bz, trRt*.55, trRt*.22, trunkMat, tg);
+    }
+    var mc=new THREE.Mesh(new THREE.SphereGeometry(cr,12,9),lm);
+    mc.position.set(tx,ty+ph+cr*.6,tz); mc.castShadow=true; tg.add(mc);
+    var nSub=3+Math.floor(rng()*3);
+    for(var si=0;si<nSub;si++){
+      var sa=rng()*Math.PI*2, sr=cr*.44+rng()*cr*.34;
+      var sd=cr*.48+rng()*cr*.38;
+      var scx=tx+Math.cos(sa)*sd, scz=tz+Math.sin(sa)*sd;
+      var scy=ty+ph+cr*.45+(rng()-.5)*cr*.55;
+      var sc=new THREE.Mesh(new THREE.SphereGeometry(sr,10,7),si%2?lm:lm2);
+      sc.position.set(scx,scy,scz); sc.castShadow=true; tg.add(sc);
+    }
+  }
+}
+
+function _buildClusterTree(tg,tx,ty,tz,td,rng,trunkMat){
+  var lc=td.c[0|rng()*td.c.length];
+  var lm=new THREE.MeshStandardMaterial({color:lc,roughness:.82,metalness:0});
+  if(td.s==='pine'){
+    var ph=6+rng()*11, numT=3+Math.floor(rng()*2);
+    var tr=new THREE.Mesh(new THREE.CylinderGeometry(.08,.28,ph*.55,7),trunkMat);
+    tr.castShadow=true; tr.position.set(tx,ty+ph*.27,tz); tg.add(tr);
+    for(var ti=0;ti<numT;ti++){
+      var tFrac=ti/numT;
+      var tY=ty+ph*(0.22+tFrac*.60), tR=(2.5-tFrac*1.4)*(0.85+rng()*.20), tH=ph*(0.40-tFrac*.04);
+      var cone=new THREE.Mesh(new THREE.ConeGeometry(tR,tH,9),lm);
+      cone.position.set(tx,tY+tH*.35,tz); cone.castShadow=true; tg.add(cone);
+    }
+    var sp=new THREE.Mesh(new THREE.ConeGeometry(.22,ph*.22,8),lm);
+    sp.position.set(tx,ty+ph*.88,tz); tg.add(sp);
+  } else if(td.s==='palm'){
+    var ph=8+rng()*10, lean=(rng()-.5)*.20;
+    var tr=new THREE.Mesh(new THREE.CylinderGeometry(.07,.20,ph,8),trunkMat);
+    tr.rotation.z=lean; tr.position.set(tx,ty+ph/2,tz); tr.castShadow=true; tg.add(tr);
+    var topY=ty+ph, topX=tx+Math.sin(lean)*ph*.45;
+    [0,Math.PI*.67,Math.PI*1.33].forEach(function(fa){
+      var fr=1.6+rng()*.8;
+      var fm=new THREE.Mesh(new THREE.SphereGeometry(fr,7,5),lm);
+      fm.scale.y=.12+rng()*.07;
+      fm.position.set(topX+Math.cos(fa)*fr*.85,topY-fr*.5,tz+Math.sin(fa)*fr*.85);
+      tg.add(fm);
+    });
+  } else if(td.s==='gorse'){
+    var br=1.4+rng()*1.7;
+    var lumps=2+Math.floor(rng()*2);
+    for(var li=0;li<lumps;li++){
+      var bs=new THREE.Mesh(new THREE.SphereGeometry(br*(.44+rng()*.32),8,6),lm);
+      bs.scale.y=.34+rng()*.18;
+      bs.position.set(tx+(rng()-.5)*br*1.3,ty+br*.24,tz+(rng()-.5)*br*1.3);
+      bs.castShadow=true; tg.add(bs);
+    }
+  } else {
+    var ph=5+rng()*8, cr=2.4+rng()*2.6;
+    var trR=.45+cr*.05, trRt=.20+cr*.04;
+    var tr=new THREE.Mesh(new THREE.CylinderGeometry(trRt,trR,ph,9),trunkMat);
+    tr.castShadow=true; tr.position.set(tx,ty+ph/2,tz); tg.add(tr);
+    var mc=new THREE.Mesh(new THREE.SphereGeometry(cr,10,7),lm);
+    mc.position.set(tx,ty+ph+cr*.55,tz); mc.castShadow=true; tg.add(mc);
+    var nSub=1+Math.floor(rng()*2);
+    for(var si=0;si<nSub;si++){
+      var sa=rng()*Math.PI*2, sr2=cr*.40+rng()*.28, sd=cr*.40+rng()*cr*.30;
+      var sc=new THREE.Mesh(new THREE.SphereGeometry(sr2,8,6),lm);
+      sc.position.set(tx+Math.cos(sa)*sd,ty+ph+cr*.36+(rng()-.5)*cr*.42,tz+Math.sin(sa)*sd);
+      sc.castShadow=true; tg.add(sc);
+    }
+  }
+}
+
+function buildTrees(hole,sty,TW){
+  var tg=new THREE.Group(); tg.name='_trees';
+  var rng=mulberry32(hole.id*7331);
+  var td=sty.trees;
+  var trunkMat=new THREE.MeshStandardMaterial({color:td.t,roughness:.92,metalness:0,bumpMap:BARK_BUMP,bumpScale:.5});
+
+  // Scattered individual trees along fairway edges
+  for(var t=0;t<td.n;t++){
+    var side=rng()>.5?1:-1;
+    var tz=-5-rng()*(hole.len+30);
+    var tfcx=getFwCX(tz,hole);
+    var tx=tfcx+side*(hole.fw*.62+6+rng()*30);
+    if(Math.abs(tx)>TW*.46) continue;
+    _buildOneTree(tg,tx,getH(tx,tz),tz,td,rng,trunkMat,side);
+  }
+
+  // Forest clusters — dense copses forming woodland groves
+  var numClusters=td.clusters||0;
+  if(numClusters>0){
+    var clRng=mulberry32(hole.id*9173+11);
+    var ucMat=new THREE.MeshStandardMaterial({color:td.uc||hexTint(td.c[0],-0x101010),roughness:.95,metalness:0});
+    for(var ci=0;ci<numClusters;ci++){
+      var cz=-18-clRng()*(hole.len-36);
+      var cfcx=getFwCX(cz,hole);
+      var cSide=clRng()>.5?1:-1;
+      var cCx=cfcx+cSide*(hole.fw*.68+4+clRng()*16);
+      var cRadius=8+clRng()*14;
+      if(Math.abs(cCx)>TW*.44) continue;
+      var cN=12+Math.floor(clRng()*16);
+
+      // Packed cluster trees using simplified geometry for performance
+      for(var ct=0;ct<cN;ct++){
+        var ang=clRng()*Math.PI*2;
+        var dist=Math.sqrt(clRng())*cRadius;
+        var ttx=cCx+Math.cos(ang)*dist;
+        var ttz=cz+Math.sin(ang)*dist;
+        if(Math.abs(ttx)>TW*.46) continue;
+        _buildClusterTree(tg,ttx,getH(ttx,ttz),ttz,td,clRng,trunkMat);
+      }
+
+      // Undergrowth: flattened spheres covering the forest floor
+      var numBushes=8+Math.floor(clRng()*12);
+      for(var bi=0;bi<numBushes;bi++){
+        var bang=clRng()*Math.PI*2, bdist=clRng()*cRadius*.95;
+        var bx=cCx+Math.cos(bang)*bdist, bz=cz+Math.sin(bang)*bdist;
+        var by=getH(bx,bz);
+        var br=.30+clRng()*.55;
+        var bush=new THREE.Mesh(new THREE.SphereGeometry(br,7,5),ucMat);
+        bush.scale.y=.18+clRng()*.14;
+        bush.position.set(bx,by+br*.14,bz);
+        tg.add(bush);
+      }
+    }
+  }
+
+  scene.add(tg);
+}
+
+function makePinFlag(hole){
+  var old=scene.getObjectByName('_flag'); if(old) scene.remove(old);
+  var fg=new THREE.Group(); fg.name='_flag';
+  var py=getH(hole.gr.x,hole.gr.z);
+  pinPos.set(hole.gr.x,py,hole.gr.z);
+
+  // Pole: tapered, metallic, 12 sides
+  var poleMat=new THREE.MeshStandardMaterial({color:0xd0dce8,roughness:.16,metalness:.80});
+  var pole=new THREE.Mesh(new THREE.CylinderGeometry(.032,.055,5.6,12),poleMat);
+  pole.position.set(pinPos.x,py+2.8,pinPos.z); fg.add(pole);
+
+  // Waving flag: custom BufferGeometry with sine-wave surface
+  var FW=1.7, FH=1.0, FU=14, FV=5;
+  var verts=[],uvs=[],tris=[];
+  for(var fv=0;fv<=FV;fv++){
+    for(var fu=0;fu<=FU;fu++){
+      var u=fu/FU, v=fv/FV;
+      var wave=Math.sin(u*Math.PI*2.2)*.28*u*u;
+      verts.push(u*FW,(v-.5)*FH,wave);
+      uvs.push(u,v);
+    }
+  }
+  for(var fv=0;fv<FV;fv++){
+    for(var fu=0;fu<FU;fu++){
+      var a=fv*(FU+1)+fu;
+      tris.push(a,a+1,a+FU+1,a+1,a+FU+2,a+FU+1);
+    }
+  }
+  var fGeo=new THREE.BufferGeometry();
+  fGeo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+  fGeo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  fGeo.setIndex(tris);
+  fGeo.computeVertexNormals();
+  var fMesh=new THREE.Mesh(fGeo,new THREE.MeshStandardMaterial({
+    color:0xdd1111,roughness:.65,side:THREE.DoubleSide,
+    emissive:0x440000,emissiveIntensity:.15
+  }));
+  fMesh.position.set(pinPos.x,py+5.28,pinPos.z); fg.add(fMesh);
+
+  // White band on flag leading edge
+  var band=new THREE.Mesh(new THREE.BoxGeometry(.04,.98,.06),
+    new THREE.MeshStandardMaterial({color:0xffffff,roughness:.4,metalness:.1}));
+  band.position.set(pinPos.x+.02,py+5.28,pinPos.z); fg.add(band);
+
+  // Hole cup: dark cylinder sunk in ground
+  var cupWall=new THREE.Mesh(new THREE.CylinderGeometry(.56,.56,.42,16,1,true),
+    new THREE.MeshStandardMaterial({color:0x07070e,roughness:.90,metalness:.08,side:THREE.BackSide}));
+  cupWall.position.set(pinPos.x,py-.17,pinPos.z); fg.add(cupWall);
+  // Cup floor
+  var cupFloor=new THREE.Mesh(new THREE.CircleGeometry(.55,16),
+    new THREE.MeshStandardMaterial({color:0x050509,roughness:.95}));
+  cupFloor.rotation.x=-Math.PI/2;
+  cupFloor.position.set(pinPos.x,py-.37,pinPos.z); fg.add(cupFloor);
+  // Aluminium rim collar
+  var rim=new THREE.Mesh(new THREE.TorusGeometry(.58,.045,8,18),
+    new THREE.MeshStandardMaterial({color:0xdce8ee,roughness:.20,metalness:.55}));
+  rim.rotation.x=Math.PI/2;
+  rim.position.set(pinPos.x,py+.04,pinPos.z); fg.add(rim);
+
+  scene.add(fg);
+}
+
+function mulberry32(a){
+  return function(){
+    a|=0; a=a+0x6D2B79F5|0;
+    var t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+// ── BALL ─────────────────────────────────────────────────
+function makeBall(){
+  if(ballMesh) scene.remove(ballMesh);
+  ballMesh=new THREE.Mesh(new THREE.SphereGeometry(BALL_R,28,20),
+    new THREE.MeshStandardMaterial({
+      color:0xf8f8f8,roughness:.62,metalness:.04,
+      bumpMap:BALL_BUMP,bumpScale:.055
+    }));
+  ballMesh.castShadow=true; ballMesh.name='_ball'; scene.add(ballMesh);
+}
+function placeBallAtTee(){
+  ballMesh.position.set(0,getH(0,0)+BALL_R,0);
+  ballVel.set(0,0,0); ballOnGround=false; aimYaw=0; aimPitch=0;
+}
+
+// ── TRAJECTORY ───────────────────────────────────────────
+var _trajMax=900; // max 300 steps × 3 floats
+var _trajBuf=new Float32Array(_trajMax);
+var _trajAttr=new THREE.BufferAttribute(_trajBuf,3);
+_trajAttr.setUsage(35048); // THREE.DynamicDrawUsage
+function makeTrajectory(){
+  if(trajectoryLine) scene.remove(trajectoryLine);
+  var geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',_trajAttr);
+  geo.setDrawRange(0,0);
+  trajectoryLine=new THREE.Line(geo,
+    new THREE.LineBasicMaterial({color:0xff4400,linewidth:2,transparent:true,opacity:.85}));
+  trajectoryLine.name='_traj'; scene.add(trajectoryLine);
+}
+var _lastTrajYaw=null,_lastTrajPitch=null,_lastTrajCharge=null;
+function updateTrajectory(charge){
+  if(!trajectoryLine||!ballMesh) return;
+  // Skip if aim unchanged since last update
+  if(_lastTrajYaw===aimYaw&&_lastTrajPitch===aimPitch&&_lastTrajCharge===charge) return;
+  _lastTrajYaw=aimYaw; _lastTrajPitch=aimPitch; _lastTrajCharge=charge;
+  var club=CLUBS[clubIdx];
+  var lR=(club.loft+aimPitch*25)*Math.PI/180;
+  var spd=club.vMax*charge;
+  var vx=spd*Math.cos(lR)*Math.sin(aimYaw), vy=spd*Math.sin(lR), vz=spd*Math.cos(lR)*(-Math.cos(aimYaw));
+  var px=ballMesh.position.x, py=ballMesh.position.y+BALL_R, pz=ballMesh.position.z;
+  var cvx=vx,cvy=vy,cvz=vz, n=0, dxz=0, ppx=px,ppz=pz, DT=.5;
+  var limit=300;
+  for(var s=0;s<limit&&dxz<TRAJ_YARDS&&n+3<=_trajMax;s++){
+    px+=cvx*DT; py+=cvy*DT; pz+=cvz*DT; cvy+=G*DT;
+    var gh=getH(px,pz)+BALL_R; if(py<gh){py=gh;cvy=0;}
+    dxz+=Math.sqrt((px-ppx)*(px-ppx)+(pz-ppz)*(pz-ppz));
+    ppx=px; ppz=pz;
+    _trajBuf[n++]=px; _trajBuf[n++]=py; _trajBuf[n++]=pz;
+  }
+  _trajAttr.needsUpdate=true;
+  trajectoryLine.geometry.setDrawRange(0,n/3);
+  trajectoryLine.geometry.computeBoundingSphere();
+}
+
+// ── CLASSIC PHYSICS ───────────────────────────────────────
+function penaltyWater(){
+  strokes++;
+  var fl=document.getElementById('penalty-flash');
+  fl.style.opacity='1'; setTimeout(function(){fl.style.opacity='0';},420);
+  placeBallAtTee(); gs='aim'; updateHUD();
+}
+
+function updatePhysicsClassic(){
+  var hole=HOLES[holeIdx];
+  if(gs!=='flying'&&gs!=='rolling') return;
+  if(!ballOnGround) ballVel.y+=G;
+  ballMesh.position.x+=ballVel.x;
+  ballMesh.position.y+=ballVel.y;
+  ballMesh.position.z+=ballVel.z;
+  var bx=ballMesh.position.x, by=ballMesh.position.y, bz=ballMesh.position.z;
+  var gh=getH(bx,bz);
+  if(hole.water){
+    var w=hole.water;
+    if(bx>=w.x1&&bx<=w.x2&&bz>=w.z1&&bz<=w.z2&&by<.9){penaltyWater();return;}
+  }
+  if(by-BALL_R<=gh){
+    // Wall-zone hit: terrain is unnaturally tall — push back, kill vertical, reflect horizontal
+    if(gh>26){
+      ballMesh.position.x-=ballVel.x*2;
+      ballMesh.position.z-=ballVel.z*2;
+      var safeGh=getH(ballMesh.position.x,ballMesh.position.z);
+      ballMesh.position.y=Math.min(by, safeGh+BALL_R+0.3);
+      ballVel.x*=-0.35; ballVel.z*=-0.35; ballVel.y=Math.min(Math.abs(ballVel.y)*0.15, 1.5);
+      ballOnGround=false; gs='flying';
+    } else {
+    ballMesh.position.y=gh+BALL_R;
+    var inGr=Math.sqrt((bx-pinPos.x)*(bx-pinPos.x)+(bz-pinPos.z)*(bz-pinPos.z))<hole.greenR;
+    var fwB=Math.max(0,1-Math.abs(bx-getFwCX(bz,hole))/(hole.fw*.55));
+    var fr=inGr?.965:fwB>.5?.945:.90;
+    if(Math.abs(ballVel.y)<.15){
+      ballVel.y=0; ballVel.x*=fr; ballVel.z*=fr;
+      ballOnGround=true; gs='rolling';
+    } else {
+      ballVel.y=Math.min(-ballVel.y*BOUNCE, 6); ballVel.x*=.82; ballVel.z*=.82;
+      ballOnGround=false; gs='flying';
+    }
+    }
+  } else {
+    ballOnGround=false;
+    if(gs==='rolling') gs='flying';
+  }
+  if(!ballOnGround){ballVel.x*=.9985;ballVel.y*=.9985;ballVel.z*=.9985;}
+  if(gs==='rolling'){
+    // Slope gravity: sample terrain gradient, push ball downhill
+    var _sx=(getH(bx+0.35,bz)-getH(bx-0.35,bz))/0.7;
+    var _sz=(getH(bx,bz+0.35)-getH(bx,bz-0.35))/0.7;
+    var _sm=Math.sqrt(_sx*_sx+_sz*_sz);
+    ballVel.x-=_sx*0.0014; ballVel.z-=_sz*0.0014;
+    var _spd=Math.sqrt(ballVel.x*ballVel.x+ballVel.z*ballVel.z);
+    // Only stop ball when both speed AND slope are very low
+    if(_spd<.006&&_sm<0.04){ballVel.set(0,0,0); gs='aim'; updateHUD();}
+  }
+  var dPin=Math.sqrt((bx-pinPos.x)*(bx-pinPos.x)+(bz-pinPos.z)*(bz-pinPos.z));
+  if(dPin<1.1&&ballVel.length()<1.2){holeComplete();}
+}
+
+// ── INPUT ────────────────────────────────────────────────
+var keys={};
+document.addEventListener('keydown',function(e){keys[e.code]=true;handleKey(e);});
+document.addEventListener('keyup',function(e){
+  keys[e.code]=false;
+  if(e.code==='Space'&&gs==='charging'){shoot();e.preventDefault();}
+});
+function handleKey(e){
+  if(e.code==='Space'&&gs==='aim'){
+    gs='charging';chargeT=0;chargeAmt=0;
+    document.getElementById('power-wrap').classList.remove('hidden');
+    e.preventDefault();
+  }
+  if(e.code==='KeyC'&&gs==='aim'){clubIdx=(clubIdx+1)%CLUBS.length;updateHUD();}
+  if(e.code==='Space') e.preventDefault();
+}
+function shoot(){
+  var club=CLUBS[clubIdx];
+  var lR=(club.loft+aimPitch*25)*Math.PI/180;
+  var spd=club.vMax*chargeAmt;
+  var d=(Math.random()-.5)*club.dispersion*chargeAmt;
+  ballVel.x=spd*Math.cos(lR)*Math.sin(aimYaw+d);
+  ballVel.y=spd*Math.sin(lR);
+  ballVel.z=spd*Math.cos(lR)*(-Math.cos(aimYaw+d));
+  ballOnGround=false; strokes++; gs='flying';
+  _lastTrajYaw=null; // invalidate trajectory cache so it recalculates on next aim
+  document.getElementById('power-wrap').classList.add('hidden');
+  if(trajectoryLine) trajectoryLine.visible=false; updateHUD();
+}
+
+// ── CAMERA ───────────────────────────────────────────────
+var camPos=new THREE.Vector3(0,6,10), camTgt=new THREE.Vector3();
+function updateCamera(){
+  var bp=ballMesh.position;
+  camPos.x+=(bp.x-Math.sin(aimYaw)*CAM_DIST-camPos.x)*.08;
+  camPos.y+=(bp.y+CAM_H-camPos.y)*.08;
+  camPos.z+=(bp.z-(-Math.cos(aimYaw))*CAM_DIST-camPos.z)*.08;
+  camera.position.copy(camPos);
+  camTgt.x+=(bp.x-camTgt.x)*.1;
+  camTgt.y+=(bp.y+1-camTgt.y)*.1;
+  camTgt.z+=(bp.z-camTgt.z)*.1;
+  camera.lookAt(camTgt);
+}
+
+// ── HUD ──────────────────────────────────────────────────
+function updateHUD(){
+  var hole=HOLES[holeIdx], club=CLUBS[clubIdx];
+  document.getElementById('h-num').textContent=hole.num;
+  document.getElementById('h-name').textContent=hole.name;
+  document.getElementById('h-par').textContent=hole.par;
+  document.getElementById('h-strokes').textContent=strokes;
+  document.getElementById('cl-name').textContent=club.name;
+  document.getElementById('cl-range').textContent='MAX '+club.maxYd+' YD';
+  if(ballMesh){
+    var d=Math.round(Math.sqrt((ballMesh.position.x-pinPos.x)**2+(ballMesh.position.z-pinPos.z)**2));
+    document.getElementById('h-dist').textContent=d;
+  }
+}
+
+// ── HOLE COMPLETE ────────────────────────────────────────
+function holeComplete(){
+  gs='hole_done'; scores.push(strokes);
+  var hole=HOLES[holeIdx], d=strokes-hole.par;
+  var lab={'-3':'🦅 Albatross!','-2':'🦅 Eagle!','-1':'🐦 Birdie!','0':'✅ Par','1':'Bogey','2':'Double Bogey'};
+  var title=document.getElementById('hc-title');
+  title.textContent=lab[String(d)]||(d>0?'+'+d+' Over':'!!');
+  title.className='hc-title';
+  document.getElementById('hc-score').textContent=strokes+' strokes · '+(d<0?d:'+'+d)+' vs par';
+  var rows=scores.map(function(s,i){
+    var h=HOLES[i],dv=s-h.par;
+    return '<div class="hc-row"><span>'+h.num+'. '+h.name+'</span><span style="color:'+(dv<0?'#5bf55b':dv===0?'#fff':dv===1?'#f5b800':'#e84e1b')+'">'+s+' <small style="opacity:.45">('+h.par+')</small></span></div>';
+  }).join('');
+  if(scores.length>1){
+    var tot=scores.reduce(function(a,b){return a+b;},0);
+    var par=HOLES.slice(0,scores.length).reduce(function(a,h){return a+h.par;},0);
+    rows+='<div class="hc-row total"><span>Total</span><span>'+tot+' / par '+par+'</span></div>';
+  }
+  document.getElementById('hc-table').innerHTML=rows;
+  document.getElementById('hc-btn').textContent=holeIdx===8?'See Final Score ▶':'Next Hole ▶';
+  var so=document.getElementById('screen-hole');
+  so.className='screen';
+  so.classList.remove('hidden');
+}
+
+function nextHole(){
+  document.getElementById('screen-hole').classList.add('hidden');
+  if(++holeIdx>=9){showGameOver();return;}
+  strokes=0; clubIdx=0; loadHole(holeIdx);
+}
+
+function showGameOver(){
+  gs='game_over';
+  document.getElementById('hud').classList.add('hidden');
+  var tot=scores.reduce(function(a,b){return a+b;},0);
+  var par=HOLES.reduce(function(a,h){return a+h.par;},0);
+  var diff=tot-par;
+  document.getElementById('go-score').textContent='Total: '+tot+' strokes';
+  document.getElementById('go-vs-par').textContent=(diff<0?diff:'+'+diff)+' vs par '+par;
+  var hs=JSON.parse(localStorage.getItem('putaway_hs')||'[]');
+  if(!hs.length||tot<hs[0].score) document.getElementById('go-hs').style.display='block';
+  hs.push({score:tot,diff:diff}); hs.sort(function(a,b){return a.score-b.score;}); hs=hs.slice(0,5);
+  localStorage.setItem('putaway_hs',JSON.stringify(hs));
+  document.getElementById('screen-over').classList.remove('hidden');
+}
+
+// ── LOAD HOLE ────────────────────────────────────────────
+function loadHole(idx){
+  buildHole(HOLES[idx]); makeBall(); placeBallAtTee(); makeTrajectory();
+  aimYaw=Math.atan2(HOLES[idx].gr.x,HOLES[idx].gr.z); aimPitch=0;
+  camPos.set(0,8,14); camTgt.set(0,2,-5);
+  gs='aim'; clubIdx=0;
+  updateHUD(); updateTrajectory(.75);
+}
+
+// ── START GAME ────────────────────────────────────────────
+function startGame(){
+  document.getElementById('home').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+
+  var pool=shuffle(ALL_HOLES.slice());
+  HOLES=pool.slice(0,9).map(function(h,i){return Object.assign({},h,{num:i+1});});
+  holeIdx=0; scores=[]; strokes=0;
+  loadHole(0);
+}
+
+function refreshHiScores(){
+  var hs=JSON.parse(localStorage.getItem('putaway_hs')||'[]');
+  var el=document.getElementById('hi-list');
+  if(!hs.length){el.innerHTML='<div style="color:rgba(255,255,255,.2);font-size:13px;letter-spacing:2px;">No rounds yet</div>';return;}
+  el.innerHTML=hs.map(function(h,i){
+    return '<div class="score-row"><span class="sr-rank">'+(i+1)+'.</span><span>'+h.score+' strokes</span><span class="sr-val">'+(h.diff<0?h.diff:'+'+h.diff)+'</span></div>';
+  }).join('');
+}
+
+refreshHiScores();
+
+// ── GAME LOOP ─────────────────────────────────────────────
+var lastT=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  var dt=Math.min((ts-lastT)/1000,.05); lastT=ts;
+
+  if(gs==='aim'||gs==='charging'||gs==='flying'||gs==='rolling'){
+    if(gs==='aim'||gs==='charging'){
+      if(keys['KeyA']||keys['ArrowLeft'])  aimYaw-=.022;
+      if(keys['KeyD']||keys['ArrowRight']) aimYaw+=.022;
+      if(keys['KeyW']||keys['ArrowUp'])    aimPitch=Math.min(.6,aimPitch+.012);
+      if(keys['KeyS']||keys['ArrowDown'])  aimPitch=Math.max(-.3,aimPitch-.012);
+    }
+    if(gs==='charging'){
+      chargeT+=dt; chargeAmt=Math.min(1,chargeT/2.2);
+      document.getElementById('power-fill').style.width=(chargeAmt*100)+'%';
+      document.getElementById('power-pct').textContent=Math.round(chargeAmt*100)+'%';
+      updateTrajectory(chargeAmt);
+    } else if(gs==='aim'){
+      updateTrajectory(.75);
+    }
+    if(trajectoryLine) trajectoryLine.visible=(gs==='aim'||gs==='charging');
+    updatePhysicsClassic();
+    renderer.shadowMap.needsUpdate=true;
+    if(ballMesh){
+      var d2=Math.round(Math.sqrt((ballMesh.position.x-pinPos.x)**2+(ballMesh.position.z-pinPos.z)**2));
+      document.getElementById('h-dist').textContent=d2;
+    }
+  }
+  // Animate water ripple offset (cached ref — no scene traversal)
+  if(waterMeshRef&&waterMeshRef.material.bumpMap){
+    waterMeshRef.material.bumpMap.offset.x=(ts*.00005)%1;
+    waterMeshRef.material.bumpMap.offset.y=(ts*.00003)%1;
+    renderer.shadowMap.needsUpdate=true;
+  }
+  if(ballMesh) updateCamera();
+  renderer.render(scene,camera);
+}
+
+window.addEventListener('resize',function(){
+  renderer.setSize(innerWidth,innerHeight);
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ── TOUCH CONTROLS ────────────────────────────────────────
+(function(){
+  var hasTouchScreen=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
+  if(!hasTouchScreen) return;
+
+  var overlay=document.getElementById('touch-overlay');
+  var aimZone=document.getElementById('touch-aim-zone');
+  var shootBtn=document.getElementById('touch-shoot-btn');
+  var joyBase=document.getElementById('touch-joy-base');
+  var joyKnob=document.getElementById('touch-joy-knob');
+  var MAX_R=50;
+
+  var hudClub=document.getElementById('hud-club');
+  var hudDist=document.getElementById('hud-dist');
+  var hudStroke=document.getElementById('hud-stroke');
+  var powerWrap=document.getElementById('power-wrap');
+  var aimHint=document.getElementById('touch-aim-hint');
+
+  // Show touch overlay during gameplay
+  function showTouchUI(){
+    overlay.classList.add('tc-active');
+    // Hide desktop-only elements
+    document.getElementById('hud-controls').style.display='none';
+    // Distance card overlaps shoot button — move to HUD-top instead
+    hudDist.style.position='static';
+    hudDist.style.background='none';
+    hudDist.style.border='none';
+    hudDist.style.padding='0';
+    document.getElementById('hud-top').appendChild(hudDist);
+    // Club card
+    hudClub.classList.add('tc-club');
+    powerWrap.classList.add('tc-power');
+    hudClub.style.display='';
+    // Aim hint text
+    aimHint.textContent='HOLD STICK TO AIM';
+  }
+
+  var _origStart=window.startGame;
+  window.startGame=function(){_origStart();setTimeout(showTouchUI,100);};
+
+  function hideTouchUI(){
+    overlay.classList.remove('tc-active');
+    joyBase.style.display='none'; joyKnob.style.display='none';
+    hudClub.classList.remove('tc-club');
+    powerWrap.classList.remove('tc-power');
+  }
+  document.getElementById('hc-btn').addEventListener('touchend',function(){hideTouchUI();setTimeout(showTouchUI,300);},{passive:true});
+
+  // ── Joystick for Classic Golf ─────────────────────────────
+  var joyId=null, joyBX=0, joyBY=0, joyOX=0, joyOY=0, joyIv=null;
+
+  aimZone.addEventListener('touchstart',function(e){
+    e.preventDefault();
+    if(gs!=='aim'&&gs!=='charging') return;
+    var t=e.changedTouches[0];
+    joyId=t.identifier;
+    joyBX=t.clientX; joyBY=t.clientY;
+    joyOX=0; joyOY=0;
+    joyBase.style.left=t.clientX+'px'; joyBase.style.top=t.clientY+'px';
+    joyBase.style.display='block';
+    joyKnob.style.left=t.clientX+'px'; joyKnob.style.top=t.clientY+'px';
+    joyKnob.style.display='block';
+
+    if(joyIv) clearInterval(joyIv);
+    joyIv=setInterval(function(){
+      if(gs!=='aim'&&gs!=='charging'){clearInterval(joyIv);joyIv=null;return;}
+      aimYaw  +=joyOX*0.03;
+      aimPitch=Math.max(-.3,Math.min(.6,aimPitch-joyOY*0.018));
+    },16);
+  },{passive:false});
+
+  aimZone.addEventListener('touchmove',function(e){
+    e.preventDefault();
+    for(var i=0;i<e.changedTouches.length;i++){
+      var t=e.changedTouches[i];
+      if(t.identifier!==joyId) continue;
+      var dx=t.clientX-joyBX, dy=t.clientY-joyBY;
+      var dist=Math.sqrt(dx*dx+dy*dy);
+      joyOX=Math.max(-1,Math.min(1,dx/MAX_R));
+      joyOY=Math.max(-1,Math.min(1,dy/MAX_R));
+      if(dist>MAX_R){dx=dx/dist*MAX_R;dy=dy/dist*MAX_R;}
+      joyKnob.style.left=(joyBX+dx)+'px'; joyKnob.style.top=(joyBY+dy)+'px';
+    }
+  },{passive:false});
+
+  function endJoy(e){
+    for(var i=0;i<e.changedTouches.length;i++){
+      if(e.changedTouches[i].identifier===joyId){
+        joyId=null; joyOX=0; joyOY=0;
+        if(joyIv){clearInterval(joyIv);joyIv=null;}
+        joyBase.style.display='none'; joyKnob.style.display='none';
+      }
+    }
+  }
+  aimZone.addEventListener('touchend',endJoy,{passive:true});
+  aimZone.addEventListener('touchcancel',endJoy,{passive:true});
+
+  // ── Shoot button ──────────────────────────────────────────
+  var shootIcon=document.getElementById('shoot-icon');
+
+  shootBtn.addEventListener('touchstart',function(e){
+    e.preventDefault();
+    if(gs==='aim'){
+      gs='charging'; chargeT=0; chargeAmt=0;
+      document.getElementById('power-wrap').classList.remove('hidden');
+      shootBtn.classList.add('charging');
+      shootIcon.textContent='●';
+    }
+  },{passive:false});
+
+  shootBtn.addEventListener('touchend',function(e){
+    e.preventDefault();
+    if(gs==='charging'){
+      shoot();
+      shootBtn.classList.remove('charging');
+      shootIcon.textContent='▶';
+    }
+  },{passive:false});
+})();
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

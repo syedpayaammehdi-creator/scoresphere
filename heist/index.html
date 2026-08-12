@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>The Heist — ScoreSphere</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+body{background:#08050c;color:#fff;font-family:'Barlow',Arial,sans-serif;overflow-x:hidden;min-height:100vh;touch-action:pan-y;}
+::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+
+.screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
+  background:radial-gradient(ellipse at 50% 20%,#150a1e 0%,#08050c 70%);z-index:40;overflow-y:auto;
+  padding:40px 20px 60px;}
+.screen.show{display:flex;}
+
+.title{font-family:'Georgia',serif;font-size:52px;font-weight:900;letter-spacing:4px;color:#f5b800;
+  text-shadow:0 0 24px rgba(245,184,0,0.6);margin-bottom:4px;text-align:center;}
+.subtitle{font-size:12px;letter-spacing:6px;color:#c084fcaa;margin-bottom:34px;text-transform:uppercase;text-align:center;}
+.btn{display:block;width:290px;max-width:80vw;padding:15px;margin:9px auto;
+  background:rgba(124,58,237,0.1);border:1px solid #7c3aed;color:#c4b5fd;
+  font:700 14px/1 'Barlow',Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;
+  cursor:pointer;box-shadow:0 0 16px rgba(124,58,237,0.2);transition:all .15s;border-radius:3px;}
+.btn:hover{background:rgba(124,58,237,0.22);box-shadow:0 0 30px rgba(124,58,237,0.5);}
+.btn-gold{border-color:#f5b800;color:#f5b800;background:rgba(245,184,0,0.08);}
+.btn-gold:hover{background:rgba(245,184,0,0.2);}
+.hint{font-size:12px;color:#ffffff66;margin-top:24px;text-align:center;max-width:420px;line-height:1.6;}
+.count{font-size:13px;color:#f5b800cc;letter-spacing:1px;margin-top:18px;text-align:center;}
+
+/* mission select grid */
+#mission-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;
+  width:100%;max-width:820px;margin:10px 0 20px;}
+.mcard{background:rgba(255,255,255,0.04);border:1px solid rgba(124,58,237,0.3);border-radius:6px;
+  padding:18px 16px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
+.mcard:hover{background:rgba(124,58,237,0.12);border-color:#c084fc;transform:translateY(-2px);}
+.mcard.locked{opacity:0.35;cursor:default;pointer-events:none;}
+.mcard-num{font-size:10px;letter-spacing:2px;color:#c084fc;margin-bottom:6px;}
+.mcard-title{font-size:18px;font-weight:800;letter-spacing:1px;margin-bottom:6px;}
+.mcard-sub{font-size:11px;color:#ffffff77;line-height:1.4;}
+.mcard-prog{font-size:10px;color:#f5b800aa;margin-top:8px;letter-spacing:1px;}
+
+/* story screen */
+#story-canvas-wrap{width:100%;max-width:480px;aspect-ratio:16/10;background:#0d0714;border:1px solid rgba(124,58,237,0.25);
+  border-radius:6px;overflow:hidden;margin-bottom:20px;position:relative;}
+#story-canvas{width:100%;height:100%;display:block;}
+#story-text{max-width:520px;font-size:16px;line-height:1.6;color:#eee;text-align:center;margin-bottom:22px;padding:0 10px;}
+#choices{display:flex;flex-direction:column;gap:10px;width:100%;max-width:460px;}
+.choice-btn{padding:15px 20px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.15);
+  color:#fff;font-size:14px;text-align:left;cursor:pointer;border-radius:4px;transition:all .15s;
+  min-height:52px;display:flex;align-items:center;}
+.choice-btn:hover{background:rgba(124,58,237,0.18);border-color:#c084fc;transform:translateX(4px);}
+.choice-btn .arrow{margin-right:10px;color:#c084fc;}
+
+/* ending screen */
+#end-title{font-size:32px;font-weight:900;letter-spacing:3px;margin:16px 0 6px;text-align:center;}
+#end-title.success{color:#4ade80;text-shadow:0 0 20px #4ade80;}
+#end-title.fail{color:#ff5566;text-shadow:0 0 20px #ff5566;}
+#end-title.twist{color:#fde047;text-shadow:0 0 20px #fde047;}
+#end-kind{font-size:10px;letter-spacing:4px;color:#ffffff55;margin-bottom:16px;text-transform:uppercase;}
+#end-caption{max-width:480px;font-size:15px;line-height:1.7;color:#ddd;text-align:center;margin-bottom:26px;padding:0 10px;}
+#end-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+#end-actions .btn{width:210px;margin:4px;}
+
+/* gallery */
+#gallery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;
+  width:100%;max-width:820px;margin:10px 0 30px;}
+.gcell{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:5px;
+  padding:12px 10px;text-align:center;min-height:70px;display:flex;flex-direction:column;justify-content:center;}
+.gcell.unlocked{border-color:rgba(255,255,255,0.25);}
+.gcell.unlocked.success{border-color:#4ade8055;}
+.gcell.unlocked.fail{border-color:#ff556655;}
+.gcell.unlocked.twist{border-color:#fde04755;}
+.gcell-title{font-size:12px;font-weight:800;letter-spacing:1px;}
+.gcell.locked .gcell-title{color:#ffffff33;}
+.gcell-mission{font-size:9px;color:#ffffff55;letter-spacing:1px;margin-top:4px;}
+
+@media (max-width:480px){ .title{font-size:38px;} #story-text{font-size:14px;} }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen show" id="home-screen">
+  <div class="title">THE HEIST</div>
+  <div class="subtitle">A Branching Caper Comedy</div>
+  <button class="btn btn-gold" id="btn-missions">Choose a Job</button>
+  <button class="btn" id="btn-gallery">Endings Gallery</button>
+  <div class="count" id="home-count"></div>
+  <div class="hint">Eight jobs. Every choice branches somewhere new — a clean success, a spectacular failure, or something nobody planned for. Tap through and see where it goes. Replay to find them all.</div>
+</div>
+
+<!-- MISSION SELECT -->
+<div class="screen" id="mission-screen">
+  <div class="title" style="font-size:34px;">CHOOSE A JOB</div>
+  <div id="mission-grid"></div>
+  <button class="btn" id="btn-missions-back">Back</button>
+</div>
+
+<!-- STORY -->
+<div class="screen" id="story-screen">
+  <div class="title" style="font-size:22px;letter-spacing:2px;" id="story-mission-title"></div>
+  <div id="story-canvas-wrap"><canvas id="story-canvas"></canvas></div>
+  <div id="story-text"></div>
+  <div id="choices"></div>
+</div>
+
+<!-- ENDING -->
+<div class="screen" id="end-screen">
+  <div id="story-canvas-wrap" style="max-width:520px;"><canvas id="end-canvas"></canvas></div>
+  <div id="end-kind"></div>
+  <div id="end-title"></div>
+  <div id="end-caption"></div>
+  <div id="end-actions">
+    <button class="btn btn-gold" id="btn-retry-mission">Try Again</button>
+    <button class="btn" id="btn-next-mission" style="display:none;">Next Job</button>
+    <button class="btn" id="btn-end-missions">All Jobs</button>
+    <button class="btn" id="btn-end-gallery">Gallery</button>
+  </div>
+</div>
+
+<!-- GALLERY -->
+<div class="screen" id="gallery-screen">
+  <div class="title" style="font-size:34px;">ENDINGS</div>
+  <div class="count" id="gallery-count"></div>
+  <div id="gallery-grid"></div>
+  <button class="btn" id="btn-gallery-back">Back</button>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ══════════════════════════════════════════════════════════════════════════
+// MISSION DATA
+// ══════════════════════════════════════════════════════════════════════════
+var MISSIONS = [
+{ id:'m1', title:'THE VAULT JOB', sub:'First National holds two million in uncut diamonds.', scene:'vault', start:'m1_1', nodes:{
+  m1_1:{ text:"The First National vault holds two million in uncut diamonds. Your crew is ready. How do you get inside?", choices:[
+    {label:"Pick the back door lock", to:'m1_2a'}, {label:"Walk in disguised as a guard", to:'m1_2b'}, {label:"Blast through the wall", to:'m1_end_brick'} ]},
+  m1_end_brick:{ end:true, title:"SUBTLE AS A BRICK", kind:'fail', caption:"The explosion works great. So does every alarm in a six-block radius. You didn't even make it to the vault door.", anim:{scene:'wall',mode:'explosion',accent:'#ff5566'} },
+  m1_2a:{ text:"You're in. The vault door has a keypad — six digits.", choices:[
+    {label:"Guess the code", to:'m1_end_lucky'}, {label:"Hack the panel", to:'m1_3a'}, {label:"Ask the janitor for the code", to:'m1_end_trusting'} ]},
+  m1_end_lucky:{ end:true, title:"LUCKY NUMBER", kind:'twist', caption:"You type 1-2-3-4-5-6. The door clicks open. Somewhere, a security consultant is about to lose his job.", anim:{scene:'vault',mode:'confetti',accent:'#fde047'} },
+  m1_end_trusting:{ end:true, title:"TOO TRUSTING", kind:'fail', caption:"The janitor smiles, radios it in, and un-clips a badge you somehow didn't notice. He was never a janitor.", anim:{scene:'vault',mode:'cuffed',accent:'#ff5566',secondary:true} },
+  m1_3a:{ text:"The hack is running. Push it fast, or play it safe?", choices:[
+    {label:"Slow and careful", to:'m1_end_clean'}, {label:"Rush it", to:'m1_end_alarm'} ]},
+  m1_end_clean:{ end:true, title:"CLEAN GETAWAY", kind:'success', caption:"Twelve minutes, not a single sound. You're three states away before the morning shift even opens the vault.", anim:{scene:'vault',mode:'walkOff',accent:'#4ade80'} },
+  m1_end_alarm:{ end:true, title:"ALARM BELLS", kind:'fail', caption:"You shave four minutes off the hack and add four years to your sentence. Patience was the actual treasure here.", anim:{scene:'vault',mode:'cuffed',accent:'#ff5566'} },
+  m1_2b:{ text:"The uniform fits. Nobody's looked twice. What now?", choices:[
+    {label:"Bluff past the real guards", to:'m1_end_promoted'}, {label:"Sneak to the vault while they're distracted", to:'m1_3b'} ]},
+  m1_end_promoted:{ end:true, title:"PROMOTED", kind:'twist', caption:"You bark orders with such confidence the other guards start taking notes. By lunch you've been asked to run the evening shift.", anim:{scene:'vault',mode:'salute',accent:'#38bdf8'} },
+  m1_3b:{ text:"The vault sits open. Cash trays on the left, a gold statue on the right.", choices:[
+    {label:"Take only the cash", to:'m1_end_modest'}, {label:"Take everything, statue included", to:'m1_end_greed'} ]},
+  m1_end_modest:{ end:true, title:"MODEST HAUL", kind:'success', caption:"Not the score of the century, but light bags move fast. You're gone before anyone counts the drawers.", anim:{scene:'vault',mode:'runOff',accent:'#4ade80'} },
+  m1_end_greed:{ end:true, title:"GREED TRIP", kind:'fail', caption:"The statue weighs more than your getaway plan accounted for. It lands on your foot. The alarm hears you scream before the sensor does.", anim:{scene:'vault',mode:'fallen',accent:'#ff5566'} }
+}},
+{ id:'m2', title:'CELL BLOCK ZERO', sub:"You're not spending one more night in here.", scene:'cell', start:'m2_1', nodes:{
+  m2_1:{ text:"Wrongly convicted or not, you're not spending one more night in Cell Block Zero. First move?", choices:[
+    {label:"Fake sick, go to the infirmary", to:'m2_2a'}, {label:"Dig a tunnel with a spoon", to:'m2_2b'}, {label:"Just ask the warden nicely", to:'m2_end_worth'} ]},
+  m2_end_worth:{ end:true, title:"WORTH A SHOT", kind:'fail', caption:"The warden laughs so hard he assigns you an extra week of laundry duty. Worth a shot, technically.", anim:{scene:'cell',mode:'idle',accent:'#94a3b8'} },
+  m2_2a:{ text:"The infirmary is quiet. A doctor's coat hangs on the door.", choices:[
+    {label:"Steal the coat", to:'m2_3a'}, {label:"Overpower the nurse", to:'m2_end_hole'} ]},
+  m2_end_hole:{ end:true, title:"IN THE HOLE", kind:'fail', caption:"The nurse was a former linebacker. You wake up in solitary with a newfound respect for hospital staff.", anim:{scene:'cell',mode:'fallen',accent:'#ff5566'} },
+  m2_3a:{ text:"Coat on, clipboard in hand, you look the part.", choices:[
+    {label:"Walk out the front gate", to:'m2_end_doctor'}, {label:"Steal the warden's car instead", to:'m2_end_joyride'} ]},
+  m2_end_doctor:{ end:true, title:"DOCTOR'S ORDERS", kind:'success', caption:"A guard stops you to ask about his knee. You prescribe rest and fluids and stroll out the gate a licensed physician.", anim:{scene:'outside',mode:'walkOff',accent:'#4ade80'} },
+  m2_end_joyride:{ end:true, title:"JOYRIDE", kind:'success', caption:"The warden's car has a full tank and terrible taste in music. You're over the county line before the tape deck finishes side A.", anim:{scene:'outside',mode:'carDrive',accent:'#4ade80'} },
+  m2_2b:{ text:"Spoon in hand, you start digging. Days pass.", choices:[
+    {label:"Keep digging for weeks", to:'m2_3b'}, {label:"Give up, the spoon just broke", to:'m2_end_spoon'} ]},
+  m2_end_spoon:{ end:true, title:"SPOON VS STONE", kind:'fail', caption:"The spoon didn't stand a chance. Neither did your parole hearing, once the guards found the hole.", anim:{scene:'cell',mode:'idle',accent:'#94a3b8'} },
+  m2_3b:{ text:"Weeks later, the tunnel finally breaks through to open air.", choices:[
+    {label:"Climb up into the yard", to:'m2_end_wrong'}, {label:"Climb up outside the wall", to:'m2_end_free'} ]},
+  m2_end_wrong:{ end:true, title:"WRONG DIRECTION", kind:'twist', caption:"You surface, dust yourself off, and realize you've tunneled in a perfect circle — straight back into your own cell.", anim:{scene:'cell',mode:'idle',accent:'#fde047'} },
+  m2_end_free:{ end:true, title:"FREE AIR", kind:'success', caption:"Grass. Sky. No bars. Best commute of your life.", anim:{scene:'outside',mode:'runOff',accent:'#4ade80'} }
+}},
+{ id:'m3', title:'THE GALLERY GRAB', sub:'The Vasquez necklace, one night only.', scene:'gallery', start:'m3_1', nodes:{
+  m3_1:{ text:"The Vasquez diamond necklace is on display for one night only, at a gala crawling with security. Your approach?", choices:[
+    {label:"Pose as an art critic", to:'m3_2a'}, {label:"Rappel in through the skylight", to:'m3_2b'}, {label:"Bribe the night guard", to:'m3_2c'} ]},
+  m3_2a:{ text:"Champagne in hand, you blend into the crowd near the display case.", choices:[
+    {label:"Swap it for a forged copy", to:'m3_end_switch'}, {label:"Just grab it and run", to:'m3_end_partyfoul'} ]},
+  m3_end_switch:{ end:true, title:"THE SWITCH", kind:'success', caption:"Nobody notices the necklace is fake until it turns green a week later. By then you're long gone.", anim:{scene:'gallery',mode:'walkOff',accent:'#4ade80'} },
+  m3_end_partyfoul:{ end:true, title:"PARTY FOUL", kind:'fail', caption:"Turns out 'grab and run' is much easier to plan than to execute in heels on marble floors.", anim:{scene:'gallery',mode:'tackled',accent:'#ff5566',secondary:true} },
+  m3_2b:{ text:"You drop through the skylight into a room lined with laser sensors.", choices:[
+    {label:"Move through slowly", to:'m3_end_graceful'}, {label:"Move through fast", to:'m3_end_litup'} ]},
+  m3_end_graceful:{ end:true, title:"GRACEFUL", kind:'success', caption:"Every bend, every dodge, textbook perfect. You'd almost call it dancing.", anim:{scene:'gallery',mode:'dance',accent:'#4ade80'} },
+  m3_end_litup:{ end:true, title:"LIT UP", kind:'fail', caption:"You look incredible weaving through the lasers. You also trip four of them. Security gets a great show before the arrest.", anim:{scene:'gallery',mode:'alarm',accent:'#ff5566'} },
+  m3_2c:{ text:"You slip the night guard a thick envelope.", choices:[
+    {label:"He pockets it and helps you", to:'m3_end_inside'}, {label:"He pockets it and calls the cops anyway", to:'m3_end_doublecross'} ]},
+  m3_end_inside:{ end:true, title:"INSIDE MAN", kind:'success', caption:"Turns out honor among thieves extends to bribed security guards. Who knew.", anim:{scene:'gallery',mode:'walkOff',accent:'#4ade80',secondary:true} },
+  m3_end_doublecross:{ end:true, title:"DOUBLE CROSSED", kind:'twist', caption:"He keeps the money AND calls it in. Technically you did get a return on investment — just not the one you wanted.", anim:{scene:'gallery',mode:'cuffed',accent:'#fde047'} }
+}},
+{ id:'m4', title:'MASQUERADE', sub:"The Contessa's ring, and a mansion full of guests.", scene:'mansion', start:'m4_1', nodes:{
+  m4_1:{ text:"The Contessa's ring is worth more than the mansion it's locked in. The party's in full swing. Your way in?", choices:[
+    {label:"Charm your way past the host", to:'m4_2a'}, {label:"Climb the trellis to a window", to:'m4_2b'} ]},
+  m4_2a:{ text:"The host is delighted to meet you. Now what?", choices:[
+    {label:"Dance with them, create a distraction", to:'m4_3a'}, {label:"Compliment their taste, angle for the study", to:'m4_end_guest'} ]},
+  m4_end_guest:{ end:true, title:"GUEST OF HONOR", kind:'twist', caption:"They're so flattered by your compliments on the ring, they take it off and GIVE it to you. You didn't even have to steal anything.", anim:{scene:'mansion',mode:'giftHandoff',accent:'#fde047',secondary:true} },
+  m4_3a:{ text:"The band strikes up a waltz. Your partner slips toward the display case.", choices:[
+    {label:"Signal them to grab the ring", to:'m4_end_perfect'}, {label:"Get too into the dance, forget the signal", to:'m4_end_swept'} ]},
+  m4_end_perfect:{ end:true, title:"PERFECT PARTNERS", kind:'success', caption:"One nod, one lift, one clean exit. You barely miss a step.", anim:{scene:'mansion',mode:'dance',accent:'#4ade80',secondary:true} },
+  m4_end_swept:{ end:true, title:"SWEPT AWAY", kind:'twist', caption:"You forget the ring, the plan, possibly your own name. Some heists just don't work out — and that's alright.", anim:{scene:'mansion',mode:'dance',accent:'#fde047',secondary:true} },
+  m4_2b:{ text:"The trellis creaks under your weight but holds — for now.", choices:[
+    {label:"The window's unlocked", to:'m4_end_easy'}, {label:"It's locked, the trellis is giving way", to:'m4_end_gravity'} ]},
+  m4_end_easy:{ end:true, title:"EASY IN", kind:'success', caption:"Sometimes the universe just says yes. In and out in under three minutes.", anim:{scene:'mansion',mode:'walkOff',accent:'#4ade80'} },
+  m4_end_gravity:{ end:true, title:"GRAVITY WINS", kind:'fail', caption:"The trellis loses its argument with physics. You lose yours with the garden pool.", anim:{scene:'pool',mode:'splash',accent:'#38bdf8'} }
+}},
+{ id:'m5', title:'SKYLINE JOB', sub:'The Meridian Diamond, eighty floors up.', scene:'skyline', start:'m5_1', nodes:{
+  m5_1:{ text:"The Meridian Diamond sits in a penthouse eighty floors up. How do you get up there?", choices:[
+    {label:"Service elevator, disguised as a waiter", to:'m5_2a'}, {label:"Climb the outside of the building", to:'m5_2b'}, {label:"Hack the elevator system remotely", to:'m5_end_ghost'} ]},
+  m5_end_ghost:{ end:true, title:"GHOST FLOOR", kind:'twist', caption:"Your hack works a little too well — the elevator opens onto a floor that isn't on any blueprint. Nobody official even knows it exists. Neither, now, does the diamond.", anim:{scene:'skyline',mode:'confetti',accent:'#fde047'} },
+  m5_2a:{ text:"Tray of champagne in hand, you ride up with the catering staff.", choices:[
+    {label:"Slip away during the toast", to:'m5_3a'}, {label:"Trip and spill wine on the host", to:'m5_end_stain'} ]},
+  m5_end_stain:{ end:true, title:"STAIN OF SHAME", kind:'fail', caption:"Red wine, white carpet, and a host who now remembers your face very, very well.", anim:{scene:'skyline',mode:'fallen',accent:'#ff5566'} },
+  m5_3a:{ text:"The diamond sits in a glass case near the balcony.", choices:[
+    {label:"Smash and grab", to:'m5_end_glass'}, {label:"Pick the lock quietly", to:'m5_end_smooth'} ]},
+  m5_end_glass:{ end:true, title:"GLASS ACT", kind:'fail', caption:"Dramatic, loud, and immediately alarmed. You really do love a big entrance.", anim:{scene:'skyline',mode:'alarm',accent:'#ff5566'} },
+  m5_end_smooth:{ end:true, title:"SMOOTH OPERATOR", kind:'success', caption:"Not a sound. Not a scratch. The diamond's in your pocket before the toast even ends.", anim:{scene:'skyline',mode:'walkOff',accent:'#4ade80'} },
+  m5_2b:{ text:"Eighty floors is a long way up with no rope.", choices:[
+    {label:"Use suction cups", to:'m5_3b'}, {label:"Free-climb, no equipment", to:'m5_end_nerves'} ]},
+  m5_end_nerves:{ end:true, title:"NERVES OF STEEL... NOT", kind:'fail', caption:"Floor forty is where your nerve, and your grip, give out at the same time. Security finds you clinging to a flagpole.", anim:{scene:'skyline',mode:'fallen',accent:'#ff5566'} },
+  m5_3b:{ text:"Cup by cup, you inch up the glass facade.", choices:[
+    {label:"The window's open", to:'m5_end_breeze'}, {label:"A gust of wind hits", to:'m5_end_wrongwindow'} ]},
+  m5_end_breeze:{ end:true, title:"BREEZE IN", kind:'success', caption:"Right window, right floor, right diamond. Occasionally the universe cooperates.", anim:{scene:'skyline',mode:'walkOff',accent:'#4ade80'} },
+  m5_end_wrongwindow:{ end:true, title:"WRONG WINDOW", kind:'twist', caption:"The wind shoves you two windows left. You climb into a stranger's bathroom instead of the penthouse. Deeply awkward. No diamond.", anim:{scene:'skyline',mode:'idle',accent:'#fde047',secondary:true} }
+}},
+{ id:'m6', title:'THE ARMORED CONVOY', sub:'Two million, one truck, one shot.', scene:'truck', start:'m6_1', nodes:{
+  m6_1:{ text:"Two million in an armored truck, one route, one shot. How do you stop it?", choices:[
+    {label:"Stage a fake accident", to:'m6_2a'}, {label:"Ambush on a motorcycle at a red light", to:'m6_2b'}, {label:"Sneak aboard at the depot", to:'m6_2c'} ]},
+  m6_2a:{ text:"You lie in the road next to a very convincingly dented car.", choices:[
+    {label:"Guards get out to help", to:'m6_end_samaritans'}, {label:"Guards call it in instead", to:'m6_end_staged'} ]},
+  m6_end_samaritans:{ end:true, title:"GOOD SAMARITANS", kind:'twist', caption:"They're so eager to help they carry the 'injured' you to safety — and your bags of cash right along with it. Chivalry isn't dead.", anim:{scene:'truck',mode:'carDrive',accent:'#fde047',secondary:true} },
+  m6_end_staged:{ end:true, title:"SUSPICIOUSLY STAGED", kind:'fail', caption:"Turns out armored car guards get a LOT of training on spotting exactly this. Rookie mistake.", anim:{scene:'truck',mode:'cuffed',accent:'#ff5566'} },
+  m6_2b:{ text:"Engine roaring, you pull alongside the truck at the light.", choices:[
+    {label:"Cut the tires", to:'m6_end_flatout'}, {label:"Try to jump onto the moving truck", to:'m6_end_roadrash'} ]},
+  m6_end_flatout:{ end:true, title:"FLAT OUT WIN", kind:'success', caption:"Four flats, zero chase. The truck isn't going anywhere and neither is anyone stopping you.", anim:{scene:'truck',mode:'walkOff',accent:'#4ade80'} },
+  m6_end_roadrash:{ end:true, title:"ROAD RASH", kind:'fail', caption:"Movies make that look so easy. You'll be picking gravel out of your jacket for weeks.", anim:{scene:'truck',mode:'fallen',accent:'#ff5566'} },
+  m6_2c:{ text:"You slip past the depot fence before the truck even loads.", choices:[
+    {label:"Hide among the cargo", to:'m6_3c'}, {label:"Disguise as a driver instead", to:'m6_end_wrongroute'} ]},
+  m6_end_wrongroute:{ end:true, title:"WRONG ROUTE", kind:'twist', caption:"Old habits die hard — you drive the truck straight to the police station out of pure muscle memory. Bold delivery service.", anim:{scene:'truck',mode:'carDrive',accent:'#fde047'} },
+  m6_3c:{ text:"Boxed in with the cargo, engine rumbling to life beneath you.", choices:[
+    {label:"Wait until the truck stops", to:'m6_end_patience'}, {label:"Act too early", to:'m6_end_premature'} ]},
+  m6_end_patience:{ end:true, title:"PATIENCE PAYS", kind:'success', caption:"The truck stops, the doors open, and you're gone with the cash before the guards finish their coffee break.", anim:{scene:'truck',mode:'runOff',accent:'#4ade80'} },
+  m6_end_premature:{ end:true, title:"PREMATURE HEIST", kind:'fail', caption:"Springing into action mid-highway at sixty miles an hour is, it turns out, a genuinely terrible idea.", anim:{scene:'truck',mode:'fallen',accent:'#ff5566'} }
+}},
+{ id:'m7', title:'HIGH ROLLER', sub:"The Golden Tiger's entire weekend take.", scene:'casino', start:'m7_1', nodes:{
+  m7_1:{ text:"The Golden Tiger casino vault holds the house's entire weekend take. Your angle?", choices:[
+    {label:"Count cards to build a bankroll first", to:'m7_2a'}, {label:"Rig the roulette wheel", to:'m7_2b'}, {label:"Go straight for the vault under the floor", to:'m7_2c'} ]},
+  m7_2a:{ text:"The count is in your head, cool as ice.", choices:[
+    {label:"Win small, stay under the radar", to:'m7_end_slowburn'}, {label:"Win big, fast", to:'m7_end_banned'} ]},
+  m7_end_slowburn:{ end:true, title:"SLOW BURN", kind:'success', caption:"Not a jackpot, but a steady, quiet, entirely legal fortune. Nobody even remembers your face.", anim:{scene:'casino',mode:'walkOff',accent:'#4ade80'} },
+  m7_end_banned:{ end:true, title:"BANNED FOR LIFE", kind:'fail', caption:"Eleven straight wins gets you a very polite, very final escort to the front door. And every other casino in the state.", anim:{scene:'casino',mode:'idle',accent:'#ff5566',secondary:true} },
+  m7_2b:{ text:"A little weight on the wheel, nobody will ever notice.", choices:[
+    {label:"Rig it just a little", to:'m7_end_lucky'}, {label:"Rig it to always win", to:'m7_end_toogood'} ]},
+  m7_end_lucky:{ end:true, title:"LUCKY STREAK", kind:'success', caption:"A believable string of good luck. The pit boss just shakes his head and buys you a drink.", anim:{scene:'casino',mode:'confetti',accent:'#4ade80'} },
+  m7_end_toogood:{ end:true, title:"TOO GOOD TO BE TRUE", kind:'fail', caption:"Twenty-three wins in a row raises exactly as many eyebrows. The pit boss was onto you by win number four.", anim:{scene:'casino',mode:'cuffed',accent:'#ff5566'} },
+  m7_2c:{ text:"Beneath the floorboards, the real vault waits.", choices:[
+    {label:"Cut through the floor at night", to:'m7_end_trapdoor'}, {label:"The cutting sets off a flood sensor", to:'m7_end_soaked'} ]},
+  m7_end_trapdoor:{ end:true, title:"TRAPDOOR TRIUMPH", kind:'success', caption:"Straight up through the floor of the vault, straight back down with the cash. Elegant.", anim:{scene:'casino',mode:'runOff',accent:'#4ade80'} },
+  m7_end_soaked:{ end:true, title:"SOAKED", kind:'twist', caption:"Nobody mentioned the fire suppression system. Cash and casino chips float past you in a foot of water. Technically, you can still grab some.", anim:{scene:'casino',mode:'splash',accent:'#38bdf8'} }
+}},
+{ id:'m8', title:'THE SUBMARINE JOB', sub:'A prototype nobody knows exists.', scene:'sub', start:'m8_1', nodes:{
+  m8_1:{ text:"Deep in Blackwater Naval Base sits a prototype nobody's supposed to know about. How do you get in?", choices:[
+    {label:"Swim in underwater at night", to:'m8_2a'}, {label:"Pose as a new recruit", to:'m8_2b'} ]},
+  m8_2a:{ text:"The water is black and cold, the base looms ahead.", choices:[
+    {label:"Sneak through the torpedo tube", to:'m8_end_tube'}, {label:"You get spotted by the guard dolphin", to:'m8_end_flipper'} ]},
+  m8_end_tube:{ end:true, title:"TUBE SNEAK", kind:'success', caption:"Absurd, cramped, and somehow completely undetected. Nobody checks the torpedo tubes for stowaways.", anim:{scene:'sub',mode:'walkOff',accent:'#4ade80'} },
+  m8_end_flipper:{ end:true, title:"FLIPPER BLEW IT", kind:'twist', caption:"Turns out the Navy trains dolphins for exactly this. You've been out-spied by a marine mammal.", anim:{scene:'sub',mode:'alarm',accent:'#fde047'} },
+  m8_2b:{ text:"New uniform, new haircut, new name tag. You blend right in.", choices:[
+    {label:"Actually do a great job blending in", to:'m8_3b'}, {label:"Salute the wrong officer", to:'m8_end_atease'} ]},
+  m8_end_atease:{ end:true, title:"AT EASE, IDIOT", kind:'fail', caption:"You salute a janitor. He is not amused. Neither is the officer standing right behind him.", anim:{scene:'sub',mode:'idle',accent:'#ff5566',secondary:true} },
+  m8_3b:{ text:"You're fitting in disturbingly well.", choices:[
+    {label:"Volunteer for night watch near the target", to:'m8_end_inside'}, {label:"Get promoted instead, forget the mission", to:'m8_end_career'} ]},
+  m8_end_inside:{ end:true, title:"INSIDE JOB", kind:'success', caption:"Alone, on watch, with the prototype twelve feet away. Some plans just work.", anim:{scene:'sub',mode:'walkOff',accent:'#4ade80'} },
+  m8_end_career:{ end:true, title:"NEW CAREER PATH", kind:'twist', caption:"They offer you a real commission. You're surprised to find yourself saying yes. The heist can wait — you've got a country to serve now, apparently.", anim:{scene:'sub',mode:'salute',accent:'#fde047'} }
+}}
+];
+
+// build a flat lookup of every ending id -> {missionIdx, node}
+var ALL_ENDINGS = [];
+MISSIONS.forEach(function(m, mi){
+  Object.keys(m.nodes).forEach(function(nid){
+    var n = m.nodes[nid];
+    if (n.end) ALL_ENDINGS.push({ id:nid, missionIdx:mi, missionTitle:m.title, node:n });
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════════════════════════════════
+function loadFound(){
+  try { return JSON.parse(localStorage.getItem('heist_endings')) || []; } catch(e){ return []; }
+}
+function saveFound(arr){ try { localStorage.setItem('heist_endings', JSON.stringify(arr)); } catch(e){} }
+var found = loadFound(); // array of ending ids
+
+function missionUnlocked(mi){
+  if (mi===0) return true;
+  var prevMission = MISSIONS[mi-1];
+  return Object.keys(prevMission.nodes).some(function(nid){
+    return prevMission.nodes[nid].end && found.indexOf(nid)>=0;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// STICK FIGURE + SCENE RENDERER
+// ══════════════════════════════════════════════════════════════════════════
+function drawStick(ctx, x, y, s, color, mode, t, facing){
+  facing = facing||1;
+  ctx.save();
+  ctx.translate(x,y); ctx.scale(s*facing, s);
+  ctx.strokeStyle=color; ctx.lineWidth=3/s; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.shadowColor=color; ctx.shadowBlur=6;
+
+  var headY=-42, neckY=-36, hipY=-8;
+  var legPhase = Math.sin(t*8);
+  var armPhase = Math.sin(t*8+Math.PI);
+
+  ctx.beginPath();
+  if (mode==='fallen'){
+    ctx.save(); ctx.rotate(Math.PI/2.1);
+    ctx.beginPath(); ctx.arc(0,-46,7,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-38); ctx.lineTo(0,-8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(-9,10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(9,10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-30); ctx.lineTo(-12,-20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-30); ctx.lineTo(12,-16); ctx.stroke();
+    ctx.restore();
+    ctx.restore(); return;
+  }
+
+  // head
+  ctx.beginPath(); ctx.arc(0,headY,7,0,Math.PI*2); ctx.stroke();
+  // spine
+  ctx.beginPath(); ctx.moveTo(0,neckY); ctx.lineTo(0,hipY); ctx.stroke();
+
+  if (mode==='cuffed'){
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-7,-10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(7,-10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-8,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(8,20); ctx.stroke();
+  } else if (mode==='surrender' || mode==='alarm'){
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-14,-40); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(14,-40); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-9,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(9,20); ctx.stroke();
+  } else if (mode==='salute'){
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(11,-46); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-8,-6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-8,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(8,20); ctx.stroke();
+  } else if (mode==='giftHandoff'){
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(16,-18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-8,-8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-8,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(8,20); ctx.stroke();
+  } else if (mode==='dance'){
+    var d1=Math.sin(t*5)*20, d2=Math.sin(t*5+2)*20;
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(d1,-42); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-d2,-42); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-8+Math.sin(t*5)*6,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(8+Math.sin(t*5+1)*6,20); ctx.stroke();
+  } else if (mode==='walk' || mode==='walkOff' || mode==='run' || mode==='runOff'){
+    var amp = (mode==='run'||mode==='runOff') ? 16 : 10;
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(legPhase*amp,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-legPhase*amp,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(armPhase*amp*0.8,-4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-armPhase*amp*0.8,-4); ctx.stroke();
+  } else if (mode==='carDrive'){
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-9,-14); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(9,-14); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-6,4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(6,4); ctx.stroke();
+  } else if (mode==='splash'){
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-16,-30); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(16,-30); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-4,18+legPhase*6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(4,18-legPhase*6); ctx.stroke();
+  } else if (mode==='tackled'){
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-16,-34); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-14,-10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-10,18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(6,20); ctx.stroke();
+  } else if (mode==='explosion'){
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-18,-36); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(18,-30); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-14,14); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(16,10); ctx.stroke();
+  } else if (mode==='confetti'){
+    var w = Math.sin(t*6)*10;
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-14+w,-44); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(14-w,-44); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-8,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(8,20); ctx.stroke();
+  } else { // idle
+    var sway = Math.sin(t*2)*2;
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(-8+sway,-4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(8+sway,-4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-7,20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(7,20); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSceneBG(ctx, W, H, scene, accent){
+  ctx.fillStyle='#0d0714'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1.5;
+  var floorY = H*0.78;
+  ctx.beginPath(); ctx.moveTo(0,floorY); ctx.lineTo(W,floorY); ctx.stroke();
+
+  ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=2;
+  if (scene==='vault' || scene==='wall'){
+    ctx.strokeRect(W*0.62,floorY-H*0.42,W*0.28,H*0.42);
+    ctx.beginPath(); ctx.arc(W*0.76,floorY-H*0.21,W*0.05,0,Math.PI*2); ctx.stroke();
+  } else if (scene==='cell'){
+    for (var i=0;i<6;i++){ ctx.beginPath(); ctx.moveTo(W*0.55+i*14,floorY-H*0.5); ctx.lineTo(W*0.55+i*14,floorY); ctx.stroke(); }
+  } else if (scene==='outside'){
+    ctx.beginPath(); ctx.arc(W*0.82,H*0.16,W*0.045,0,Math.PI*2); ctx.stroke();
+    ctx.strokeRect(W*0.1,floorY-H*0.28,W*0.16,H*0.28);
+  } else if (scene==='gallery'){
+    ctx.strokeRect(W*0.6,floorY-H*0.4,W*0.18,H*0.28);
+    ctx.strokeRect(W*0.82,floorY-H*0.36,W*0.13,H*0.24);
+  } else if (scene==='mansion'){
+    ctx.beginPath(); ctx.moveTo(W*0.5,H*0.1); ctx.lineTo(W*0.44,H*0.22); ctx.lineTo(W*0.56,H*0.22); ctx.closePath(); ctx.stroke();
+    for (var i=0;i<5;i++){ ctx.beginPath(); ctx.moveTo(W*0.48+i*0.008*W, H*0.1+i*3); ctx.lineTo(W*0.48+i*0.008*W, H*0.22); ctx.stroke(); }
+  } else if (scene==='pool'){
+    ctx.fillStyle='rgba(56,189,248,0.18)'; ctx.fillRect(W*0.15,floorY-H*0.06,W*0.7,H*0.12);
+    ctx.strokeRect(W*0.15,floorY-H*0.06,W*0.7,H*0.12);
+  } else if (scene==='skyline'){
+    for (var i=0;i<4;i++){ var bw=W*0.06, bx=W*0.55+i*bw*1.4, bh=H*0.2+((i*37)%3)*H*0.08;
+      ctx.strokeRect(bx,floorY-bh,bw,bh); }
+  } else if (scene==='truck'){
+    ctx.strokeRect(W*0.55,floorY-H*0.22,W*0.3,H*0.22);
+    ctx.beginPath(); ctx.arc(W*0.62,floorY,7,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W*0.78,floorY,7,0,Math.PI*2); ctx.stroke();
+  } else if (scene==='casino'){
+    ctx.beginPath(); ctx.arc(W*0.72,floorY-H*0.18,H*0.14,0,Math.PI*2); ctx.stroke();
+    for (var i=0;i<8;i++){ var a=(i/8)*Math.PI*2; ctx.beginPath(); ctx.moveTo(W*0.72,floorY-H*0.18); ctx.lineTo(W*0.72+Math.cos(a)*H*0.14,floorY-H*0.18+Math.sin(a)*H*0.14); ctx.stroke(); }
+  } else if (scene==='sub'){
+    ctx.beginPath(); ctx.ellipse(W*0.7,floorY-H*0.12,W*0.22,H*0.1,0,0,Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
+
+  // accent wash
+  var g = ctx.createRadialGradient(W*0.5,H*0.4,0,W*0.5,H*0.4,W*0.7);
+  g.addColorStop(0, accent+'22'); g.addColorStop(1, 'transparent');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+}
+
+function renderVignette(ctx, W, H, t, anim){
+  drawSceneBG(ctx, W, H, anim.scene, anim.accent);
+  var floorY = H*0.78;
+  var travel = Math.min(1,t/2.4);
+  var mode = anim.mode;
+  var px = W*0.5, facing=1, s=Math.min(W,H)*0.0055;
+  if (mode==='walkOff'){ px = W*0.3 + travel*W*0.5; mode='walk'; }
+  else if (mode==='runOff'){ px = W*0.25 + travel*W*0.65; mode='run'; }
+  else if (mode==='carDrive'){ px = W*0.25 + travel*W*0.6; }
+  if (mode==='splash'){ px = W*0.45; }
+
+  if (anim.secondary){
+    drawStick(ctx, px+40*s*8, floorY, s*0.95, '#888', anim.mode==='dance'?'dance':'idle', t, -1);
+  }
+  drawStick(ctx, px, floorY, s, anim.accent, mode, t, facing);
+
+  if (anim.mode==='alarm'){
+    ctx.save(); ctx.globalAlpha = (Math.sin(t*14)+1)/2*0.25;
+    ctx.fillStyle='#ff2233'; ctx.fillRect(0,0,W,H); ctx.restore();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// UI FLOW
+// ══════════════════════════════════════════════════════════════════════════
+var screens = {};
+['home-screen','mission-screen','story-screen','end-screen','gallery-screen'].forEach(function(id){ screens[id]=document.getElementById(id); });
+function showScreen(id){ Object.keys(screens).forEach(function(k){ screens[k].classList.toggle('show', k===id); }); }
+
+function updateHomeCount(){
+  document.getElementById('home-count').textContent = found.length + ' / ' + ALL_ENDINGS.length + ' endings found';
+}
+updateHomeCount();
+
+document.getElementById('btn-missions').addEventListener('click', function(){ renderMissionGrid(); showScreen('mission-screen'); });
+document.getElementById('btn-missions-back').addEventListener('click', function(){ showScreen('home-screen'); updateHomeCount(); });
+document.getElementById('btn-gallery').addEventListener('click', function(){ renderGallery(); showScreen('gallery-screen'); });
+document.getElementById('btn-gallery-back').addEventListener('click', function(){ showScreen('home-screen'); updateHomeCount(); });
+document.getElementById('btn-end-missions').addEventListener('click', function(){ renderMissionGrid(); showScreen('mission-screen'); });
+document.getElementById('btn-end-gallery').addEventListener('click', function(){ renderGallery(); showScreen('gallery-screen'); });
+
+function renderMissionGrid(){
+  var el = document.getElementById('mission-grid');
+  el.innerHTML='';
+  MISSIONS.forEach(function(m, mi){
+    var unlocked = missionUnlocked(mi);
+    var endIds = Object.keys(m.nodes).filter(function(n){ return m.nodes[n].end; });
+    var foundCount = endIds.filter(function(id){ return found.indexOf(id)>=0; }).length;
+    var card = document.createElement('div');
+    card.className = 'mcard'+(unlocked?'':' locked');
+    card.innerHTML = '<div class="mcard-num">JOB '+(mi+1)+'</div>'+
+      '<div class="mcard-title">'+(unlocked?m.title:'???')+'</div>'+
+      '<div class="mcard-sub">'+(unlocked?m.sub:'Complete the previous job to unlock.')+'</div>'+
+      (unlocked?('<div class="mcard-prog">'+foundCount+' / '+endIds.length+' endings</div>'):'');
+    if (unlocked) card.addEventListener('click', function(){ startMission(mi); });
+    el.appendChild(card);
+  });
+}
+
+var currentMissionIdx = 0, currentNodeId = null;
+var storyCanvas = document.getElementById('story-canvas'), storyCtx = storyCanvas.getContext('2d');
+var endCanvas = document.getElementById('end-canvas'), endCtx = endCanvas.getContext('2d');
+function fitCanvas(cv){ var r=cv.parentElement.getBoundingClientRect(); cv.width=r.width*2; cv.height=r.height*2; }
+
+function startMission(mi){
+  currentMissionIdx = mi;
+  currentNodeId = MISSIONS[mi].start;
+  document.getElementById('story-mission-title').textContent = MISSIONS[mi].title;
+  showScreen('story-screen');
+  renderStoryNode();
+}
+
+var storyAnimRAF = null, storyAnimT = 0;
+function stopStoryAnim(){ if (storyAnimRAF){ cancelAnimationFrame(storyAnimRAF); storyAnimRAF=null; } }
+
+function renderStoryNode(){
+  var mission = MISSIONS[currentMissionIdx];
+  var node = mission.nodes[currentNodeId];
+  document.getElementById('story-text').textContent = node.text;
+  var choicesEl = document.getElementById('choices');
+  choicesEl.innerHTML='';
+  node.choices.forEach(function(c){
+    var b = document.createElement('button');
+    b.className='choice-btn';
+    b.innerHTML = '<span class="arrow">▸</span>'+c.label;
+    b.addEventListener('click', function(){ goToNode(c.to); });
+    choicesEl.appendChild(b);
+  });
+  fitCanvas(storyCanvas);
+  stopStoryAnim(); storyAnimT=0;
+  var idleAnim = { scene: mission.scene, mode:'idle', accent:'#c084fc' };
+  var t0 = performance.now();
+  function frame(now){
+    storyAnimT = (now-t0)/1000;
+    renderVignette(storyCtx, storyCanvas.width, storyCanvas.height, storyAnimT, idleAnim);
+    storyAnimRAF = requestAnimationFrame(frame);
+  }
+  storyAnimRAF = requestAnimationFrame(frame);
+}
+
+function goToNode(nodeId){
+  var mission = MISSIONS[currentMissionIdx];
+  var node = mission.nodes[nodeId];
+  currentNodeId = nodeId;
+  if (node.end){
+    stopStoryAnim();
+    showEnding(mission, nodeId, node);
+  } else {
+    renderStoryNode();
+  }
+}
+
+function showEnding(mission, nodeId, node){
+  if (found.indexOf(nodeId)<0){ found.push(nodeId); saveFound(found); }
+  document.getElementById('end-title').textContent = node.title;
+  document.getElementById('end-title').className = node.kind;
+  document.getElementById('end-kind').textContent = node.kind==='success'?'SUCCESS':node.kind==='fail'?'BUSTED':'PLOT TWIST';
+  document.getElementById('end-caption').textContent = node.caption;
+
+  var nextMi = currentMissionIdx+1;
+  var nextBtn = document.getElementById('btn-next-mission');
+  if (nextMi < MISSIONS.length){
+    nextBtn.style.display='block';
+    nextBtn.onclick = function(){ startMission(nextMi); };
+  } else nextBtn.style.display='none';
+  document.getElementById('btn-retry-mission').onclick = function(){ startMission(currentMissionIdx); };
+
+  showScreen('end-screen');
+  fitCanvas(endCanvas);
+  stopStoryAnim(); storyAnimT=0;
+  var t0 = performance.now();
+  function frame(now){
+    storyAnimT = (now-t0)/1000;
+    renderVignette(endCtx, endCanvas.width, endCanvas.height, storyAnimT, node.anim);
+    storyAnimRAF = requestAnimationFrame(frame);
+  }
+  storyAnimRAF = requestAnimationFrame(frame);
+}
+
+function renderGallery(){
+  var el = document.getElementById('gallery-grid');
+  el.innerHTML='';
+  document.getElementById('gallery-count').textContent = found.length + ' / ' + ALL_ENDINGS.length + ' unlocked';
+  ALL_ENDINGS.forEach(function(e){
+    var isFound = found.indexOf(e.id)>=0;
+    var cell = document.createElement('div');
+    cell.className = 'gcell'+(isFound?(' unlocked '+e.node.kind):' locked');
+    cell.innerHTML = '<div class="gcell-title">'+(isFound?e.node.title:'???')+'</div>'+
+      '<div class="gcell-mission">'+(isFound?e.missionTitle:'LOCKED')+'</div>';
+    el.appendChild(cell);
+  });
+}
+
+window.addEventListener('resize', function(){
+  if (screens['story-screen'].classList.contains('show')) fitCanvas(storyCanvas);
+  if (screens['end-screen'].classList.contains('show')) fitCanvas(endCanvas);
+});
+
+})();
+</script>
+</body>
+</html>

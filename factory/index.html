@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FACTORY</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#1a1a1a;--floor:#222;--grid:#2a2a2a;--accent:#f5a400;--accent2:#e84e1b;
+  --metal:#444;--dark:#111;--text:#ddd;--dim:#888;
+  --green:#4caf50;--red:#e53935;--blue:#1e88e5;--purple:#9c27b0;
+}
+html,body{width:100%;height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;user-select:none;}
+#app{display:flex;width:100%;height:100%;}
+#sidebar{width:260px;min-width:260px;max-width:260px;background:#111;border-right:2px solid #333;display:flex;flex-direction:column;z-index:10;overflow:hidden;}
+#main{flex:1;position:relative;overflow:hidden;min-width:0;}
+#factory-canvas{position:absolute;top:0;left:0;display:block;}
+
+/* ── TOP BAR ── */
+#top-bar{padding:8px 14px;background:#0d0d0d;border-bottom:2px solid #333;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+#factory-name{font-size:16px;font-weight:700;letter-spacing:4px;color:var(--accent);display:flex;align-items:center;gap:8px;}
+.tb-stat{display:flex;flex-direction:column;align-items:center;min-width:60px;}
+.tb-val{font-size:14px;font-weight:700;color:var(--accent);}
+.tb-val.green{color:#6dbf6d;}
+.tb-val.red{color:var(--red);}
+.tb-val.white{color:#fff;}
+.tb-lbl{font-size:8px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;}
+.tb-sep{width:1px;height:32px;background:#333;margin:0 2px;}
+#day-badge{background:#1a1000;border:1px solid #4a3000;border-radius:3px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:2px;margin-left:auto;}
+
+/* ── TABS ── */
+.tabs{display:flex;border-bottom:2px solid #333;flex-shrink:0;}
+.tab{flex:1;padding:8px 2px;font-size:9px;letter-spacing:1px;text-transform:uppercase;text-align:center;cursor:pointer;color:var(--dim);border:none;background:none;transition:color .15s,background .15s;}
+.tab.active{color:var(--accent);background:#1a1600;border-bottom:2px solid var(--accent);margin-bottom:-2px;}
+.tab:hover:not(.active){color:var(--text);}
+
+/* ── PANELS ── */
+.panel{display:none;flex:1;overflow-y:auto;padding:8px;flex-direction:column;gap:6px;}
+.panel.active{display:flex;}
+.psec{font-size:8px;letter-spacing:3px;color:var(--dim);padding:6px 4px 3px;text-transform:uppercase;}
+
+/* ── SHOP CARDS ── */
+.shop-card{background:#1c1c1c;border:1px solid #333;border-radius:3px;padding:9px 11px;cursor:pointer;transition:border-color .15s,background .15s;position:relative;}
+.shop-card:hover:not(.locked){border-color:var(--accent);background:#201800;}
+.shop-card.locked{opacity:.4;cursor:default;}
+.shop-card.selected{border-color:var(--accent);background:#201800;box-shadow:0 0 8px rgba(245,164,0,.2);}
+.sc-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.sc-icon{width:26px;height:26px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.sc-name{font-size:11px;font-weight:700;letter-spacing:1px;}
+.sc-desc{font-size:9px;color:var(--dim);line-height:1.4;margin-bottom:5px;}
+.sc-cost{font-size:11px;color:var(--accent);font-weight:700;}
+.sc-rate{font-size:10px;color:#6dbf6d;margin-left:auto;}
+.sc-badge{position:absolute;top:5px;right:7px;font-size:7px;letter-spacing:2px;padding:2px 5px;border-radius:2px;background:rgba(245,164,0,.15);color:var(--accent);border:1px solid rgba(245,164,0,.3);}
+
+/* ── MARKET CARDS ── */
+.prod-card{background:#1c1c1c;border:1px solid #333;border-radius:3px;padding:9px 11px;}
+.prod-card.focused{border-color:var(--accent);background:#201800;}
+.prod-header{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.prod-icon{font-size:18px;}
+.prod-name{font-size:12px;font-weight:700;flex:1;}
+.prod-price{font-size:14px;font-weight:900;}
+.prod-price.up{color:#6dbf6d;}
+.prod-price.down{color:var(--red);}
+.prod-price.flat{color:#fff;}
+.prod-bars{display:flex;gap:6px;margin-bottom:6px;}
+.prod-bar-wrap{flex:1;}
+.prod-bar-lbl{font-size:8px;letter-spacing:2px;color:var(--dim);margin-bottom:2px;}
+.prod-bar{height:5px;background:#2a2a2a;border-radius:3px;overflow:hidden;}
+.prod-bar-fill{height:100%;border-radius:3px;transition:width .4s;}
+.focus-btn{width:100%;padding:5px;border-radius:3px;font-family:'Courier New',monospace;font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;border:1px solid #444;background:#1a1a1a;color:var(--dim);transition:all .15s;}
+.focus-btn.active{border-color:var(--accent);color:var(--accent);background:#201800;}
+.focus-btn:hover:not(.active){border-color:#888;color:var(--text);}
+
+/* ── CONTRACT CARDS ── */
+.contract-card{background:#1c1c1c;border:1px solid #2a2a4a;border-radius:3px;padding:9px 11px;}
+.contract-card.accepted{border-color:#2a4a2a;}
+.cc-title{font-size:11px;font-weight:700;margin-bottom:3px;}
+.cc-details{font-size:9px;color:var(--dim);margin-bottom:6px;line-height:1.5;}
+.cc-progress{height:4px;background:#2a2a2a;border-radius:2px;overflow:hidden;margin-bottom:5px;}
+.cc-prog-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:2px;transition:width .3s;}
+.cc-btns{display:flex;gap:5px;}
+.cc-btn{flex:1;padding:5px;border-radius:3px;font-family:'Courier New',monospace;font-size:9px;font-weight:700;letter-spacing:1px;cursor:pointer;border:none;}
+.cc-btn.accept{background:rgba(30,136,229,.25);color:var(--blue);border:1px solid rgba(30,136,229,.4);}
+.cc-btn.accept:hover{background:rgba(30,136,229,.4);}
+.cc-btn.decline{background:rgba(80,80,80,.2);color:var(--dim);border:1px solid #333;}
+
+/* ── STAFF CARDS ── */
+.staff-card{background:#1c1c1c;border:1px solid #333;border-radius:3px;padding:9px 11px;}
+.sc2-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.sc2-icon{font-size:18px;}
+.sc2-info{flex:1;}
+.sc2-name{font-size:11px;font-weight:700;}
+.sc2-effect{font-size:9px;color:#6dbf6d;margin-top:1px;}
+.sc2-salary{font-size:9px;color:var(--accent);}
+.sc2-controls{display:flex;align-items:center;gap:6px;}
+.sc2-count{font-size:14px;font-weight:700;min-width:24px;text-align:center;}
+.sc2-btn{width:26px;height:26px;border-radius:3px;border:1px solid #444;background:#1a1a1a;color:var(--text);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:border-color .1s;}
+.sc2-btn:hover{border-color:var(--accent);}
+
+/* ── FINANCE CARDS ── */
+.invest-card{background:#1c1c1c;border:1px solid #333;border-radius:3px;padding:9px 11px;cursor:pointer;transition:border-color .15s;}
+.invest-card:hover:not(.invested){border-color:var(--purple);}
+.invest-card.invested{border-color:#2a2a2a;opacity:.6;cursor:default;}
+.ic-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.ic-icon{font-size:18px;}
+.ic-name{font-size:11px;font-weight:700;flex:1;}
+.ic-return{font-size:11px;font-weight:700;color:#b39ddb;}
+.ic-desc{font-size:9px;color:var(--dim);margin-bottom:5px;line-height:1.4;}
+.ic-input{width:100%;padding:5px 8px;background:#0d0d0d;border:1px solid #333;border-radius:3px;color:var(--text);font-family:'Courier New',monospace;font-size:11px;margin-bottom:5px;}
+.ic-input:focus{outline:none;border-color:var(--purple);}
+.ic-btn{width:100%;padding:5px;border-radius:3px;font-family:'Courier New',monospace;font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;border:1px solid rgba(156,39,176,.4);background:rgba(156,39,176,.15);color:#b39ddb;transition:background .15s;}
+.ic-btn:hover{background:rgba(156,39,176,.3);}
+.active-inv{background:#1c1c1c;border:1px solid #2a2a3a;border-radius:3px;padding:8px 11px;display:flex;align-items:center;gap:8px;}
+.ai-type{font-size:10px;font-weight:700;color:#b39ddb;min-width:80px;}
+.ai-amount{font-size:12px;font-weight:700;color:var(--accent);}
+.ai-maturity{font-size:9px;color:var(--dim);}
+.ai-ret{font-size:10px;color:#6dbf6d;margin-left:auto;}
+
+/* ── UPGRADE CARDS ── */
+.upgrade-card{background:#1c1c1c;border:1px solid #333;border-radius:3px;padding:9px 11px;cursor:pointer;transition:border-color .15s;}
+.upgrade-card:hover:not(.locked):not(.bought){border-color:var(--blue);}
+.upgrade-card.bought{border-color:#2a4a2a;opacity:.55;cursor:default;}
+.upgrade-card.locked{opacity:.3;cursor:default;}
+.uc-name{font-size:11px;font-weight:700;margin-bottom:3px;}
+.uc-desc{font-size:9px;color:var(--dim);line-height:1.4;margin-bottom:5px;}
+.uc-cost{font-size:11px;color:var(--blue);}
+
+/* ── STAT ROWS ── */
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#1c1c1c;border-radius:3px;}
+.stat-lbl{font-size:9px;color:var(--dim);letter-spacing:2px;}
+.stat-val{font-size:12px;font-weight:700;}
+
+/* ── CANVAS ── */
+
+/* ── TOOLBAR ── */
+#toolbar{position:absolute;bottom:0;left:0;right:0;background:rgba(17,17,17,.92);backdrop-filter:blur(8px);border-top:2px solid #333;padding:7px 14px;display:flex;align-items:center;gap:8px;}
+.tool-btn{padding:6px 12px;background:#1c1c1c;border:1px solid #444;border-radius:3px;color:var(--text);font-family:'Courier New',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:border-color .15s,background .15s;}
+.tool-btn:hover{border-color:var(--accent);background:#201800;}
+.tool-btn.active-tool{border-color:var(--accent);background:#201800;color:var(--accent);}
+#tool-hint{font-size:9px;color:var(--dim);letter-spacing:1px;margin-left:auto;}
+
+/* ── TOOLTIP ── */
+#tooltip{position:absolute;background:#111;border:1px solid #444;border-radius:3px;padding:5px 9px;font-size:9px;color:var(--text);pointer-events:none;display:none;z-index:100;max-width:160px;line-height:1.5;}
+
+/* ── NOTIFICATION ── */
+#notify{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:#111;border:1px solid var(--accent);border-radius:3px;padding:6px 16px;font-size:10px;letter-spacing:2px;color:var(--accent);opacity:0;transition:opacity .3s;pointer-events:none;z-index:200;white-space:nowrap;}
+
+/* ── EVENT MODAL ── */
+#event-modal{position:absolute;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:300;flex-direction:column;gap:0;}
+#event-modal.show{display:flex;}
+.em-box{background:#111;border:2px solid var(--accent);border-radius:4px;padding:24px 28px;max-width:360px;width:90%;}
+.em-title{font-size:16px;font-weight:700;color:var(--accent);letter-spacing:3px;margin-bottom:8px;}
+.em-body{font-size:11px;color:var(--dim);line-height:1.7;margin-bottom:18px;}
+.em-btns{display:flex;gap:10px;}
+.em-btn{flex:1;padding:10px;border-radius:3px;font-family:'Courier New',monospace;font-size:11px;font-weight:700;letter-spacing:2px;cursor:pointer;border:none;text-transform:uppercase;}
+.em-btn.primary{background:var(--accent);color:#000;}
+.em-btn.secondary{background:rgba(255,255,255,.08);color:var(--dim);border:1px solid #333;}
+
+/* ── TIER SCREEN ── */
+#tier-screen{position:absolute;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:300;flex-direction:column;gap:14px;}
+#tier-screen.show{display:flex;}
+.ts-title{font-size:32px;font-weight:700;letter-spacing:6px;color:var(--accent);text-transform:uppercase;}
+.ts-sub{font-size:12px;color:var(--dim);letter-spacing:3px;}
+.ts-btn{margin-top:10px;padding:12px 36px;background:var(--accent);color:#000;border:none;font-family:'Courier New',monospace;font-size:13px;font-weight:700;letter-spacing:3px;cursor:pointer;border-radius:3px;}
+
+/* ── BACK ── */
+#back-btn{position:absolute;top:8px;right:10px;background:rgba(255,255,255,.06);border:1px solid #333;border-radius:3px;color:var(--dim);font-family:'Courier New',monospace;font-size:8px;letter-spacing:2px;padding:4px 9px;cursor:pointer;z-index:50;transition:color .15s,border-color .15s;}
+#back-btn:hover{color:var(--text);border-color:#555;}
+
+/* ── EXPAND PANEL ── */
+.gloc-card{background:#1c1c1c;border:1px solid #333;border-radius:3px;padding:9px 11px;margin-bottom:4px;}
+.gloc-card.owned{border-color:#2a3a4a;}
+.gloc-card.locked{opacity:.35;}
+.gloc-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.gloc-flag{font-size:18px;}
+.gloc-name{font-size:11px;font-weight:700;}
+.gloc-income{font-size:10px;color:#b39ddb;font-weight:700;}
+.gloc-desc{font-size:8px;color:var(--dim);margin-top:1px;}
+.gloc-bonus{font-size:9px;color:#6dbf6d;margin:3px 0 5px;}
+.gloc-btn{width:100%;padding:5px;border-radius:3px;font-family:'Courier New',monospace;font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;border:1px solid rgba(156,39,176,.4);background:rgba(156,39,176,.12);color:#b39ddb;transition:background .15s;}
+.gloc-btn:hover:not(.owned-btn){background:rgba(156,39,176,.28);}
+.gloc-btn.owned-btn{border-color:#1a4a2a;background:rgba(76,175,80,.1);color:#6dbf6d;cursor:default;}
+.co-card{background:#1c1c1c;border:1px solid #333;border-radius:3px;padding:9px 11px;margin-bottom:4px;}
+.co-card.owned{border-color:#1a4a2a;}
+.co-card.locked{opacity:.35;}
+.co-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.co-icon{font-size:18px;}
+.co-name{font-size:11px;font-weight:700;}
+.co-income{font-size:10px;color:#6dbf6d;font-weight:700;}
+.co-desc{font-size:8px;color:var(--dim);margin-top:1px;}
+.co-bonus{font-size:9px;color:#f5a400;margin:3px 0 5px;}
+.co-btn{width:100%;padding:5px;border-radius:3px;font-family:'Courier New',monospace;font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;border:1px solid rgba(229,57,53,.4);background:rgba(229,57,53,.1);color:#ef9a9a;transition:background .15s;}
+.co-btn:hover:not(.owned-btn){background:rgba(229,57,53,.24);}
+.co-btn.owned-btn{border-color:#1a4a2a;background:rgba(76,175,80,.1);color:#6dbf6d;cursor:default;}
+.exp-summary{background:#0a0a18;border:1px solid #1a1a3a;border-radius:3px;padding:8px 11px;margin-bottom:4px;}
+.exp-summary-row{display:flex;justify-content:space-between;align-items:center;}
+.exp-passive-val{font-size:14px;font-weight:700;color:#b39ddb;}
+.exp-bonus-line{font-size:8px;color:#6dbf6d;margin-top:2px;}
+
+.panel::-webkit-scrollbar{width:3px;}
+.panel::-webkit-scrollbar-track{background:#111;}
+.panel::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
+
+/* ── MOBILE ── */
+@media(max-width:640px){
+  #app{flex-direction:column-reverse;}
+  #sidebar{width:100%;min-width:0;max-width:none;height:44%;border-right:none;border-top:2px solid #333;}
+  #main{height:56%;}
+  .tab{font-size:8px;padding:8px 2px;}
+  #toolbar{padding:5px 8px;gap:5px;}
+  .tool-btn{padding:8px 10px;font-size:9px;min-height:36px;}
+  #tool-hint{display:none;}
+  #back-btn{top:5px;right:6px;}
+  #top-bar{padding:5px 10px;gap:6px;flex-wrap:nowrap;overflow-x:auto;}
+  /* Bigger touch targets */
+  .sc2-btn{width:38px;height:38px;font-size:20px;}
+  .focus-btn{padding:9px;font-size:10px;}
+  .cc-btn{padding:9px;font-size:10px;}
+  .ic-btn{padding:9px;}
+  .shop-card,.prod-card,.contract-card,.staff-card,.invest-card,.upgrade-card{padding:10px 12px;}
+  /* Tier bar compact */
+  .tier-bar{padding:8px 10px;}
+  .em-box{padding:18px 16px;}
+  .em-btn{padding:12px 8px;font-size:10px;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="top-bar">
+      <div id="factory-name">
+        <svg width="18" height="18" viewBox="0 0 22 22"><rect x="1" y="10" width="20" height="10" fill="#f5a400" rx="1"/><rect x="3" y="6" width="4" height="4" fill="#f5a400"/><rect x="9" y="4" width="4" height="6" fill="#f5a400"/><rect x="15" y="7" width="4" height="3" fill="#f5a400"/><rect x="4" y="12" width="3" height="5" fill="#111"/><rect x="10" y="13" width="3" height="4" fill="#111"/><rect x="15" y="12" width="3" height="5" fill="#111"/></svg>
+        FACTORY
+      </div>
+      <div class="tb-sep"></div>
+      <div class="tb-stat"><div class="tb-val" id="money-display">$0</div><div class="tb-lbl">CASH</div></div>
+      <div class="tb-stat"><div class="tb-val green" id="rate-display">+$0/s</div><div class="tb-lbl">INCOME</div></div>
+      <div class="tb-stat"><div class="tb-val red" id="expense-display">-$0/s</div><div class="tb-lbl">COSTS</div></div>
+      <div class="tb-stat"><div class="tb-val" id="passive-display" style="color:#b39ddb">—</div><div class="tb-lbl">PASSIVE</div></div>
+      <div id="day-badge">DAY <span id="day-num">1</span></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('build')">BUILD</button>
+      <button class="tab" onclick="switchTab('market')">MARKET</button>
+      <button class="tab" onclick="switchTab('guide')">GUIDE</button>
+      <button class="tab" onclick="switchTab('staff')">STAFF</button>
+      <button class="tab" onclick="switchTab('finance')">$$</button>
+      <button class="tab" onclick="switchTab('upgrades')">UPGR</button>
+      <button class="tab" onclick="switchTab('expand')">🌍</button>
+    </div>
+    <div class="panel active" id="panel-build"></div>
+    <div class="panel" id="panel-market"></div>
+    <div class="panel" id="panel-guide"></div>
+    <div class="panel" id="panel-staff"></div>
+    <div class="panel" id="panel-finance"></div>
+    <div class="panel" id="panel-upgrades"></div>
+    <div class="panel" id="panel-expand"></div>
+  </div>
+
+  <div id="main">
+    <canvas id="factory-canvas"></canvas>
+    <button id="back-btn" onclick="window.location.href='/'">◀ SCORESPHERE</button>
+    <div id="toolbar">
+      <button class="tool-btn active-tool" id="tool-select" onclick="setTool('select')">SELECT</button>
+      <button class="tool-btn" id="tool-conveyor" onclick="setTool('conveyor')">CONVEYOR</button>
+      <button class="tool-btn" id="tool-delete" onclick="setTool('delete')">DELETE</button>
+      <span id="tool-hint">Select a machine and click grid to place</span>
+    </div>
+    <div id="tooltip"></div>
+    <div id="notify"></div>
+    <div id="event-modal">
+      <div class="em-box">
+        <div class="em-title" id="em-title">EVENT</div>
+        <div class="em-body" id="em-body"></div>
+        <div class="em-btns" id="em-btns"></div>
+      </div>
+    </div>
+    <div id="tier-screen">
+      <div class="ts-title" id="ts-title">TIER UP!</div>
+      <div class="ts-sub" id="ts-sub">New machines unlocked</div>
+      <button class="ts-btn" onclick="closeTierScreen()">CONTINUE ▶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── GRID ─────────────────────────────────────────────────────────────────────
+var CELL=48, COLS=22, ROWS=14;
+
+// ── MACHINES ─────────────────────────────────────────────────────────────────
+// type:'source'    → generates raw materials (no inputs)
+// type:'processor' → consumes inputs, produces intermediates
+// type:'assembly'  → takes product recipe inputs, sells finished goods
+var MACHINES={
+  // ── SOURCES ────────────────────────────────────────────────────────────────
+  iron_mine:{id:'iron_mine',name:'Iron Mine',icon:'⛏️',color:'#2a0e04',border:'#8a2a08',
+    desc:'Digs iron ore.',cost:30,baseCost:30,w:1,h:1,tierReq:0,type:'source',out:'iron_ore',rate:0.5},
+  copper_mine:{id:'copper_mine',name:'Copper Mine',icon:'🟤',color:'#2a1004',border:'#a04008',
+    desc:'Digs copper ore.',cost:40,baseCost:40,w:1,h:1,tierReq:0,type:'source',out:'copper_ore',rate:0.4},
+  lumber:{id:'lumber',name:'Lumber',icon:'🌲',color:'#041408',border:'#186018',
+    desc:'Chops wood logs.',cost:30,baseCost:30,w:1,h:1,tierReq:0,type:'source',out:'wood_log',rate:0.4},
+  sand_pit:{id:'sand_pit',name:'Sand Pit',icon:'🏖️',color:'#1a1404',border:'#685010',
+    desc:'Digs sand.',cost:25,baseCost:25,w:1,h:1,tierReq:0,type:'source',out:'sand',rate:0.6},
+  cotton_farm:{id:'cotton_farm',name:'Cotton Farm',icon:'🌾',color:'#041408',border:'#306028',
+    desc:'Grows cotton.',cost:30,baseCost:30,w:1,h:1,tierReq:0,type:'source',out:'cotton',rate:0.35},
+  // ── PROCESSORS ─────────────────────────────────────────────────────────────
+  furnace:{id:'furnace',name:'Furnace',icon:'🔥',color:'#2a0600',border:'#cc2400',
+    desc:'Ore→ingot · Sand→glass.',cost:120,baseCost:120,w:2,h:2,tierReq:0,type:'processor',
+    recipes:[{in:{iron_ore:1},out:{iron_ingot:1},time:3},{in:{sand:2},out:{glass:1},time:4}]},
+  sawmill:{id:'sawmill',name:'Sawmill',icon:'🪚',color:'#180c00',border:'#7a3808',
+    desc:'Wood→planks (×2).',cost:100,baseCost:100,w:2,h:1,tierReq:0,type:'processor',
+    recipes:[{in:{wood_log:1},out:{plank:2},time:2}]},
+  wire_drawer:{id:'wire_drawer',name:'Wire Drawer',icon:'🔌',color:'#180c00',border:'#a04800',
+    desc:'Copper ore→wire (×3).',cost:100,baseCost:100,w:2,h:1,tierReq:0,type:'processor',
+    recipes:[{in:{copper_ore:1},out:{wire:3},time:3}]},
+  press:{id:'press',name:'Press',icon:'🔨',color:'#081020',border:'#205880',
+    desc:'Ingots→steel plate.',cost:400,baseCost:400,w:2,h:2,tierReq:1,type:'processor',
+    recipes:[{in:{iron_ingot:2},out:{steel_plate:1},time:5}]},
+  loom:{id:'loom',name:'Loom',icon:'🧵',color:'#140620',border:'#602890',
+    desc:'Cotton→fabric.',cost:350,baseCost:350,w:2,h:2,tierReq:1,type:'processor',
+    recipes:[{in:{cotton:2},out:{fabric:1},time:4}]},
+  circuit_mk:{id:'circuit_mk',name:'Circuit Maker',icon:'💡',color:'#001408',border:'#0c8830',
+    desc:'Wire+sand→circuit.',cost:800,baseCost:800,w:2,h:2,tierReq:1,type:'processor',
+    recipes:[{in:{wire:2,sand:1},out:{circuit:1},time:6}]},
+  cnc:{id:'cnc',name:'CNC Cutter',icon:'🎯',color:'#080620',border:'#3838cc',
+    desc:'Refines steel (×2 out).',cost:2000,baseCost:2000,w:3,h:2,tierReq:2,type:'processor',
+    recipes:[{in:{steel_plate:1},out:{steel_plate:2},time:4}]},
+  robot_arm:{id:'robot_arm',name:'Robot Arm',icon:'🦾',color:'#081420',border:'#186888',
+    desc:'Fast ingot duplication.',cost:4000,baseCost:4000,w:2,h:2,tierReq:2,type:'processor',
+    recipes:[{in:{iron_ingot:1},out:{iron_ingot:2},time:1.5}]},
+  // ── ASSEMBLY ───────────────────────────────────────────────────────────────
+  assembly:{id:'assembly',name:'Assembly',icon:'🏭',color:'#000814',border:'#1e88e5',
+    desc:'Assembles focused product. Connect conveyor to Repository to sell.',cost:200,baseCost:200,w:2,h:2,tierReq:0,type:'assembly'},
+  repository:{id:'repository',name:'Repository',icon:'🏦',color:'#001a10',border:'#20a060',
+    desc:'Receives finished goods via conveyor. Auto-sells based on market demand.',cost:500,baseCost:500,w:2,h:2,tierReq:0,type:'repository'},
+};
+
+// ── ITEMS ─────────────────────────────────────────────────────────────────────
+var ITEMS={
+  iron_ore:   {name:'Iron Ore', col:'#a03020'},
+  copper_ore: {name:'Copper',   col:'#b04808'},
+  wood_log:   {name:'Wood',     col:'#604018'},
+  sand:       {name:'Sand',     col:'#c0a030'},
+  cotton:     {name:'Cotton',   col:'#d0c8b8'},
+  iron_ingot: {name:'Ingot',    col:'#808898'},
+  steel_plate:{name:'Steel',    col:'#4060a0'},
+  wire:       {name:'Wire',     col:'#e07000'},
+  circuit:    {name:'Circuit',  col:'#14a030'},
+  plank:      {name:'Plank',    col:'#b07828'},
+  fabric:     {name:'Fabric',   col:'#7830a8'},
+  glass:      {name:'Glass',    col:'#58a0d0'},
+  // finished products (transported to Repository)
+  components: {name:'Components',  col:'#909090'},
+  steel:      {name:'Steel Bars',  col:'#5070a0'},
+  electronics:{name:'Electronics', col:'#00c050'},
+  chemicals:  {name:'Chemicals',   col:'#90c020'},
+  vehicles:   {name:'Vehicles',    col:'#e05020'},
+  medicine:   {name:'Medicine',    col:'#e060c0'},
+  aerospace:  {name:'Aerospace',   col:'#40b0f0'},
+  quantum:    {name:'Quantum',     col:'#c040f0'},
+};
+
+// ── PRODUCT RECIPES (what Assembly needs to make each product) ────────────────
+var PRODUCT_RECIPES={
+  components: {in:{iron_ingot:2,wire:1},                    time:5},
+  steel:      {in:{steel_plate:1},                           time:3},
+  electronics:{in:{circuit:2,wire:1},                        time:7},
+  chemicals:  {in:{glass:2,plank:1},                         time:6},
+  vehicles:   {in:{steel_plate:4,circuit:1,wire:2},          time:18},
+  medicine:   {in:{fabric:2,glass:1},                        time:12},
+  aerospace:  {in:{steel_plate:6,circuit:3,wire:3},          time:28},
+  quantum:    {in:{circuit:5,glass:2,wire:4},                 time:38},
+};
+
+// ── PRODUCTS ─────────────────────────────────────────────────────────────────
+var PRODUCTS={
+  components:{id:'components',name:'Components',icon:'⚙️',basePrice:8,baseDemand:180,tierReq:0,desc:'Basic mechanical parts'},
+  steel:{id:'steel',name:'Steel Bars',icon:'🔩',basePrice:15,baseDemand:140,tierReq:0,desc:'Raw metal stock'},
+  electronics:{id:'electronics',name:'Electronics',icon:'💡',basePrice:45,baseDemand:90,tierReq:1,desc:'Circuit boards & chips'},
+  chemicals:{id:'chemicals',name:'Chemicals',icon:'🧪',basePrice:38,baseDemand:80,tierReq:1,desc:'Industrial solvents'},
+  vehicles:{id:'vehicles',name:'Vehicles',icon:'🚗',basePrice:180,baseDemand:35,tierReq:2,desc:'Manufactured transport'},
+  medicine:{id:'medicine',name:'Medicine',icon:'💊',basePrice:130,baseDemand:55,tierReq:2,desc:'Pharmaceutical goods'},
+  aerospace:{id:'aerospace',name:'Aerospace',icon:'🚀',basePrice:650,baseDemand:12,tierReq:3,desc:'Space-grade components'},
+  quantum:{id:'quantum',name:'Quantum Tech',icon:'⚛️',basePrice:2800,baseDemand:4,tierReq:3,desc:'Next-gen technology'},
+};
+
+// ── UPGRADES ─────────────────────────────────────────────────────────────────
+var UPGRADES=[
+  {id:'speed1',name:'Lubrication System',desc:'All machines +25% speed.',cost:500,mult:{rate:1.25},tierReq:0,bought:false},
+  {id:'value1',name:'Quality Control',desc:'Product value +50%.',cost:800,mult:{value:1.5},tierReq:0,bought:false},
+  {id:'speed2',name:'Overclocking',desc:'All machines +50% speed.',cost:3000,mult:{rate:1.5},tierReq:1,bought:false},
+  {id:'value2',name:'Premium Materials',desc:'Product value +100%.',cost:5000,mult:{value:2.0},tierReq:1,bought:false},
+  {id:'speed3',name:'Hydraulic Boost',desc:'All machines +75% speed.',cost:15000,mult:{rate:1.75},tierReq:2,bought:false},
+  {id:'cap1',name:'Extended Shifts',desc:'+30% income.',cost:20000,mult:{value:1.3},tierReq:2,bought:false},
+  {id:'speed4',name:'Nano-Lubricant',desc:'All machines ×2 speed.',cost:60000,mult:{rate:2.0},tierReq:3,bought:false},
+  {id:'value3',name:'Export License',desc:'Product value ×3.',cost:80000,mult:{value:3.0},tierReq:3,bought:false},
+];
+
+// ── WORKER TYPES ─────────────────────────────────────────────────────────────
+var WORKER_TYPES=[
+  {id:'worker',name:'Assembly Worker',icon:'👷',salary:0.5,effect:'production +15% per worker',boostType:'rate',boost:0.15},
+  {id:'engineer',name:'Engineer',icon:'👨‍🔬',salary:1.2,effect:'machine cost -8% per engineer',boostType:'cost',boost:0.08},
+  {id:'manager',name:'Manager',icon:'👔',salary:2.0,effect:'contract reward +20% each',boostType:'contract',boost:0.20},
+  {id:'analyst',name:'Market Analyst',icon:'📊',salary:1.5,effect:'product price +10% each',boostType:'value',boost:0.10},
+];
+
+// ── INVESTMENT TYPES ──────────────────────────────────────────────────────────
+var INVEST_TYPES=[
+  {id:'bonds',name:'Gov. Bonds',icon:'📋',retMin:1.05,retMax:1.05,days:7,desc:'Safe 5% return after 7 days. Zero risk.'},
+  {id:'stocks',name:'Tech Stocks',icon:'📈',retMin:.8,retMax:1.6,days:3,desc:'Volatile. 3-day hold. −20% to +60%.'},
+  {id:'realestate',name:'Real Estate',icon:'🏭',retMin:1.12,retMax:1.20,days:14,desc:'Solid 12−20% over 14 days.'},
+  {id:'startup',name:'Startup Bet',icon:'🎲',retMin:.0,retMax:3.0,days:10,desc:'All-or-nothing. 50% chance of 3× return after 10 days.'},
+];
+
+// ── TIERS ─────────────────────────────────────────────────────────────────────
+var TIERS=[
+  {id:0,name:'Workshop',goal:5000},
+  {id:1,name:'Small Factory',goal:50000},
+  {id:2,name:'Industrial Plant',goal:500000},
+  {id:3,name:'Megaplant',goal:5000000},
+  {id:4,name:'EMPIRE',goal:Infinity},
+];
+
+// ── GAME STATE ────────────────────────────────────────────────────────────────
+var money=0, totalEarned=0, tier=0;
+var speedMult=1, valueMult=1;
+var placed={}; // "col,row" → machine obj
+var conveyors={};
+var selectedMachine=null;
+var currentTool='select';
+var currentProduct='components'; // current factory focus
+var gameDay=1, dayTimer=0;
+var DAY_DURATION=60; // real seconds per game day
+
+// Market state: price + supply/demand
+var market={};
+var priceOverride={}; // player-set sell price multiplier per product (default 1.0)
+Object.keys(PRODUCTS).forEach(function(pid){
+  var p=PRODUCTS[pid];
+  market[pid]={price:p.basePrice, demand:p.baseDemand, priceHist:[p.basePrice], trend:0};
+  priceOverride[pid]=1.0;
+});
+
+// Workers: {type, id}
+var workers=[];
+
+// Contracts: {id, product, qty, reward, deadline, accepted, progress, penalty}
+var contracts=[], contractIdSeq=0;
+
+// Active investments: {type, amount, matures, retMult}
+var investments=[];
+
+// Active laws/modifiers: {id, name, desc, expiresDay, effect}
+var activeLaws=[];
+
+// R&D: {pid, progress, totalCost, invested}
+var rdProjects={};
+
+// Event queue
+var pendingEvent=null;
+var lastEventDay=0;
+
+var lastTick=Date.now();
+
+// ── CONVEYOR / ITEM-FLOW ──────────────────────────────────────────────────────
+var DIRS={r:[1,0],l:[-1,0],u:[0,-1],d:[0,1]};
+var CONVEYOR_INTERVAL=1.0; // seconds per belt hop (reduced by speedMult upgrades)
+var cvTick=0;
+// Assembly throughput tracking
+var assemblyCount=0, assemblyRate=0, assemblyWindow=0;
+
+// ── CANVAS ────────────────────────────────────────────────────────────────────
+var canvas=document.getElementById('factory-canvas');
+var ctx=canvas.getContext('2d');
+var camX=0, camY=0;
+var isDragging=false, dragSX=0, dragSY=0, dragCX=0, dragCY=0;
+var ghostX=null, ghostY=null;
+var conveyorDir='r';
+
+function resize(){
+  var main=document.getElementById('main');
+  var rect=main.getBoundingClientRect();
+  var w=rect.width||main.offsetWidth||window.innerWidth-260;
+  var h=rect.height||main.offsetHeight||window.innerHeight;
+  canvas.width=w;
+  canvas.height=h;
+  draw();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function fmt(n){
+  if(n>=1e9) return '$'+(n/1e9).toFixed(2)+'B';
+  if(n>=1e6) return '$'+(n/1e6).toFixed(2)+'M';
+  if(n>=1e3) return '$'+(n/1e3).toFixed(1)+'K';
+  return '$'+Math.floor(n);
+}
+function fmtUnits(n){
+  if(n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return (n/1e3).toFixed(0)+'K';
+  return Math.floor(n)+'';
+}
+var notifyTO2=null;
+function showNotify(msg,col){
+  var el=document.getElementById('notify');
+  el.textContent=msg;
+  el.style.borderColor=col||'var(--accent)';
+  el.style.color=col||'var(--accent)';
+  el.style.opacity='1';
+  if(notifyTO2) clearTimeout(notifyTO2);
+  notifyTO2=setTimeout(function(){el.style.opacity='0';},2000);
+}
+
+// ── ITEM FLOW HELPERS ─────────────────────────────────────────────────────────
+function getCell(col,row){
+  return placed[col+','+row]||conveyors[col+','+row]||null;
+}
+function bufCount(buf){
+  if(!buf) return 0;
+  return Object.values(buf).reduce(function(s,v){return s+v;},0);
+}
+function canAcceptItem(def,type){
+  if(!def||def.type==='source') return false;
+  if(def.type==='processor')
+    return def.recipes.some(function(r){return r.in.hasOwnProperty(type);});
+  if(def.type==='assembly'){
+    var pr=PRODUCT_RECIPES[currentProduct];
+    return pr&&pr.in.hasOwnProperty(type);
+  }
+  if(def.type==='repository') return PRODUCTS.hasOwnProperty(type);
+  return false;
+}
+
+function tickSources(dt){
+  var seen=new Set();
+  Object.values(placed).forEach(function(m){
+    var k=m.col+':'+m.row;if(seen.has(k))return;seen.add(k);
+    var def=MACHINES[m.id];
+    if(def.type!=='source') return;
+    m.srcTimer=(m.srcTimer||0)+dt*effSpeed();
+    var interval=1/def.rate;
+    while(m.srcTimer>=interval){
+      m.srcTimer-=interval;
+      if(bufCount(m.outBuf)<8) m.outBuf[def.out]=(m.outBuf[def.out]||0)+1;
+    }
+  });
+}
+
+function tickConveyors(dt){
+  cvTick+=dt*effSpeed();
+  if(cvTick<CONVEYOR_INTERVAL) return;
+  cvTick-=CONVEYOR_INTERVAL; // preserve remainder so speed upgrades are accurate
+  // Pass 1: each conveyor pulls one item from the cell behind it
+  Object.values(conveyors).forEach(function(cv){
+    var dd=DIRS[cv.dir],bx=cv.col-dd[0],by=cv.row-dd[1];
+    var src=getCell(bx,by);if(!src) return;
+    var srcBuf=src.outBuf||src.buf||null;if(!srcBuf) return;
+    var types=Object.keys(srcBuf).filter(function(t){return srcBuf[t]>0;});
+    if(!types.length||bufCount(cv.buf)>=4) return;
+    var t=types[0];
+    srcBuf[t]--;if(srcBuf[t]<=0)delete srcBuf[t];
+    cv.buf[t]=(cv.buf[t]||0)+1;
+  });
+  // Pass 2: each conveyor pushes one item to the cell in front of it
+  Object.values(conveyors).forEach(function(cv){
+    var types=Object.keys(cv.buf).filter(function(t){return cv.buf[t]>0;});
+    if(!types.length) return;
+    var dd=DIRS[cv.dir],fx=cv.col+dd[0],fy=cv.row+dd[1];
+    var dst=getCell(fx,fy);if(!dst) return;
+    var t=types[0];
+    if(dst.inBuf!==undefined){
+      // Next cell is a machine
+      var inCap=MACHINES[dst.id]&&MACHINES[dst.id].type==='repository'?64:8;
+      if(canAcceptItem(MACHINES[dst.id],t)&&bufCount(dst.inBuf)<inCap){
+        cv.buf[t]--;if(cv.buf[t]<=0)delete cv.buf[t];
+        dst.inBuf[t]=(dst.inBuf[t]||0)+1;
+      }
+    } else if(dst.buf!==undefined){
+      // Next cell is another conveyor
+      if(bufCount(dst.buf)<4){
+        cv.buf[t]--;if(cv.buf[t]<=0)delete cv.buf[t];
+        dst.buf[t]=(dst.buf[t]||0)+1;
+      }
+    }
+  });
+}
+
+function tickProcessors(dt){
+  var seen=new Set();
+  Object.values(placed).forEach(function(m){
+    var k=m.col+':'+m.row;if(seen.has(k))return;seen.add(k);
+    var def=MACHINES[m.id];
+    if(def.type==='source'||def.type==='repository') return;
+    if(m.flash>0) m.flash--;
+    if(m.processing){
+      m.processTimer-=dt;
+      if(m.processTimer<=0){
+        var rec=m.processRecipe;
+        if(def.type==='assembly'){
+          if(bufCount(m.outBuf)<16){
+            m.outBuf[currentProduct]=(m.outBuf[currentProduct]||0)+1;
+          }
+          m.flash=10;
+        } else {
+          Object.keys(rec.out).forEach(function(type){
+            var cnt=rec.out[type];
+            if(bufCount(m.outBuf)+cnt<=10) m.outBuf[type]=(m.outBuf[type]||0)+cnt;
+          });
+          m.flash=4;
+        }
+        m.processing=false;m.processTimer=0;m.processRecipe=null;
+      }
+      return;
+    }
+    // Try to start a recipe
+    var recipes;
+    if(def.type==='processor') recipes=def.recipes;
+    else if(def.type==='assembly'){
+      var pr=PRODUCT_RECIPES[currentProduct];
+      recipes=pr?[{in:pr.in,out:{},time:pr.time}]:[];
+    } else recipes=[];
+    for(var ri=0;ri<recipes.length;ri++){
+      var rec=recipes[ri];
+      var ok=Object.keys(rec.in).every(function(t){return (m.inBuf[t]||0)>=(rec.in[t]||0);});
+      if(ok){
+        Object.keys(rec.in).forEach(function(t){m.inBuf[t]-=rec.in[t];if(m.inBuf[t]<=0)delete m.inBuf[t];});
+        m.processing=true;
+        m.processTimer=rec.time/effSpeed();
+        m.processRecipe=rec;
+        break;
+      }
+    }
+  });
+}
+
+// ── PRODUCTION RATE ───────────────────────────────────────────────────────────
+function getProductionRate(){
+  // Returns rolling average of assembly units/second
+  var wBoost=1+(workers.filter(function(w){return w.type==='worker';}).length*0.15);
+  return assemblyRate*wBoost;
+}
+
+function getUnitValue(){
+  return getUnitValueFor(currentProduct);
+}
+
+function getUnitValueFor(pid){
+  var p=market[pid]; if(!p) return 0;
+  var ov=priceOverride[pid]||1.0;
+  var v=p.price*effValue()*ov;
+  var aCount=workers.filter(function(w){return w.type==='analyst';}).length;
+  v*=(1+aCount*0.10);
+  activeLaws.forEach(function(l){if(l.effect.value) v*=l.effect.value;});
+  // Acquired company market bonuses (product-specific)
+  ownedCompanies.forEach(function(cid){
+    var co=COMPANIES.find(function(c){return c.id===cid;});
+    if(co&&co.marketBonus&&co.marketBonus[pid]) v*=co.marketBonus[pid];
+  });
+  return v;
+}
+
+function tickRepository(dt){
+  var seen=new Set();
+  Object.values(placed).forEach(function(m){
+    var k=m.col+':'+m.row;if(seen.has(k))return;seen.add(k);
+    var def=MACHINES[m.id];
+    if(!def||def.type!=='repository') return;
+    if(m.flash>0) m.flash--;
+    if(!m.saleTimers) m.saleTimers={};
+    if(!m.nextSaleIn) m.nextSaleIn={};
+    Object.keys(m.inBuf).forEach(function(pid){
+      if(!m.inBuf[pid]||m.inBuf[pid]<=0||!market[pid]) return;
+      var effDemand=market[pid].demand*globalDemandBonus;
+      m.saleTimers[pid]=(m.saleTimers[pid]||0)+dt*effSpeed();
+      if(!m.nextSaleIn[pid]){
+        // Interval in real-seconds: higher demand → shorter interval → faster sales
+        var base=Math.max(0.3,60/Math.max(1,effDemand));
+        m.nextSaleIn[pid]=base*(0.6+Math.random()*0.8);
+      }
+      if(m.saleTimers[pid]>=m.nextSaleIn[pid]){
+        m.saleTimers[pid]-=m.nextSaleIn[pid];
+        var base2=Math.max(0.3,60/Math.max(1,effDemand));
+        m.nextSaleIn[pid]=base2*(0.6+Math.random()*0.8);
+        m.inBuf[pid]--;
+        if(m.inBuf[pid]<=0) delete m.inBuf[pid];
+        var uv=getUnitValueFor(pid);
+        money+=uv; totalEarned+=uv; assemblyCount++;
+        m.flash=6;
+        contracts.forEach(function(c){
+          if(c.accepted&&!c.done&&c.product===pid){
+            c.progress++;if(c.progress>=c.qty) completeContract(c);
+          }
+        });
+      }
+    });
+  });
+}
+
+function getDailyExpense(){
+  var dailySalary=0;
+  var salaryMap={worker:0.5,engineer:1.2,manager:2.0,analyst:1.5};
+  workers.forEach(function(w){dailySalary+=salaryMap[w.type]||0;});
+  // Law modifiers
+  var taxMult=1;
+  activeLaws.forEach(function(l){if(l.effect.tax) taxMult*=l.effect.tax;});
+  if(globalTaxFree) taxMult*=0.1; // Dubai: 90% salary reduction
+  return dailySalary*taxMult;
+}
+
+// ── TICK ──────────────────────────────────────────────────────────────────────
+function tick(){
+  var now=Date.now();
+  var dt=Math.min((now-lastTick)/1000,.1);
+  lastTick=now;
+
+  // Item flow pipeline
+  tickSources(dt);
+  tickConveyors(dt);
+  tickProcessors(dt);
+  tickRepository(dt);
+
+  // Assembly rate tracking (3-second rolling window)
+  assemblyWindow+=dt;
+  if(assemblyWindow>=3){
+    assemblyRate=assemblyCount/assemblyWindow;
+    assemblyCount=0; assemblyWindow=0;
+  }
+
+  // Daily expenses
+  var expense=getDailyExpense()*dt/DAY_DURATION;
+  money=Math.max(0,money-expense);
+
+  // Passive income from global factories and acquired companies
+  money+=getPassiveIncome()*dt;
+
+  // Day timer
+  dayTimer+=dt;
+  if(dayTimer>=DAY_DURATION){
+    dayTimer=0; gameDay++;
+    document.getElementById('day-num').textContent=gameDay;
+    onNewDay();
+  }
+
+  // Market fluctuation (driven by real assembly throughput)
+  updateMarket(dt, getProductionRate());
+
+  // Investment maturity
+  investments.forEach(function(inv){
+    if(inv.done) return;
+    if(gameDay>=inv.matures){
+      var ret=inv.amount*inv.retMult;
+      money+=ret;
+      showNotify('INVESTMENT RETURNED '+fmt(ret),'#b39ddb');
+      inv.done=true;
+    }
+  });
+  investments=investments.filter(function(i){return !i.done;});
+
+  // Law expiry
+  activeLaws=activeLaws.filter(function(l){return l.expiresDay>gameDay;});
+
+  // Tier check
+  checkTier();
+
+  updateHUDBar(getProductionRate()*getUnitValue(), getDailyExpense()/DAY_DURATION);
+
+  draw();
+  requestAnimationFrame(tick);
+}
+
+function onNewDay(){
+  // Pay daily salaries
+  // (already deducted per-second above, this is just for events)
+
+  // Random event every 3-6 days
+  if(gameDay-lastEventDay>=3+Math.floor(Math.random()*4) && !pendingEvent){
+    lastEventDay=gameDay;
+    spawnRandomEvent();
+  }
+
+  // Check contract deadlines (penalties for failed accepted contracts)
+  checkContractDeadlines();
+
+  // Refresh contracts
+  if(gameDay%2===0) addContracts();
+
+  // Market demand drift
+  Object.keys(PRODUCTS).forEach(function(pid){
+    var p=PRODUCTS[pid];
+    market[pid].demand=Math.max(p.baseDemand*.5, Math.min(p.baseDemand*2,
+      market[pid].demand + (Math.random()-.45)*p.baseDemand*.12
+    ));
+  });
+
+  renderMarketPanel();
+  renderFinancePanel();
+  renderStaffPanel();
+}
+
+// ── MARKET ────────────────────────────────────────────────────────────────────
+function updateMarket(dt, playerProdRate){
+  Object.keys(PRODUCTS).forEach(function(pid){
+    var p=PRODUCTS[pid];
+    var m=market[pid];
+    var supply=currentProduct===pid ? playerProdRate : 0;
+    var ratio=m.demand/Math.max(1,supply*8);
+    var target=p.basePrice*Math.max(0.35,Math.min(4,ratio));
+    var prev=m.price;
+    m.price+=(target-m.price)*0.005*dt;
+    m.trend=m.price>prev+0.01?1:m.price<prev-0.01?-1:0;
+  });
+}
+
+function setFocus(pid){
+  if(currentProduct===pid) return;
+  currentProduct=pid;
+  // Clear all assembly machines so they immediately switch to the new recipe
+  var seen=new Set();
+  Object.values(placed).forEach(function(m){
+    var k=m.col+':'+m.row;if(seen.has(k))return;seen.add(k);
+    if(MACHINES[m.id]&&MACHINES[m.id].type==='assembly'){
+      m.inBuf={}; m.processing=false; m.processTimer=0; m.processRecipe=null;
+    }
+  });
+  showNotify('FOCUS: '+PRODUCTS[pid].name.toUpperCase()+' — assembly cleared for new recipe','#1e88e5');
+  renderMarketPanel();
+  renderBuildPanel();  // update Assembly card recipe description
+  renderGuidePanel();  // update guide for new product
+}
+
+// ── CONTRACTS ─────────────────────────────────────────────────────────────────
+function addContracts(){
+  // Keep at most 3 pending (not accepted)
+  var pending=contracts.filter(function(c){return !c.accepted&&!c.expired;});
+  while(pending.length<3){
+    var c=generateContract();
+    if(c){contracts.push(c);pending.push(c);}
+    else break;
+  }
+  // Expire old pending contracts
+  contracts.forEach(function(c){
+    if(!c.accepted&&!c.done&&gameDay>c.deadline) c.expired=true;
+  });
+  contracts=contracts.filter(function(c){return !c.expired||c.accepted;});
+  renderMarketPanel();
+}
+
+function generateContract(){
+  var pids=Object.keys(PRODUCTS).filter(function(pid){
+    var p=PRODUCTS[pid];
+    return (!p.tierReq||p.tierReq<=tier)&&!contracts.find(function(c){return !c.accepted&&c.product===pid;});
+  });
+  if(!pids.length) return null;
+  var pid=pids[Math.floor(Math.random()*pids.length)];
+  var qty=Math.floor((80+Math.random()*200)*(tier+1));
+  var mMult=workers.filter(function(w){return w.type==='manager';}).length;
+  var reward=Math.floor(qty*market[pid].price*(1.4+Math.random()*.8)*(1+mMult*0.2));
+  var penalty=Math.floor(reward*.25);
+  return{id:++contractIdSeq,product:pid,qty:qty,reward:reward,penalty:penalty,
+    deadline:gameDay+3+Math.floor(Math.random()*4),accepted:false,done:false,expired:false,progress:0};
+}
+
+function acceptContract(id){
+  var c=contracts.find(function(c){return c.id===id;});
+  if(!c||c.accepted) return;
+  c.accepted=true;
+  showNotify('CONTRACT ACCEPTED');
+  if(currentProduct!==c.product) showNotify('TIP: Switch focus to '+PRODUCTS[c.product].name,'#6dbf6d');
+  renderMarketPanel();
+}
+
+function completeContract(c){
+  if(c.done) return;
+  c.done=true;
+  money+=c.reward;
+  showNotify('CONTRACT COMPLETE! +'+fmt(c.reward),'#6dbf6d');
+  renderMarketPanel();
+}
+
+function checkContractDeadlines(){
+  contracts.forEach(function(c){
+    if(c.accepted&&!c.done&&gameDay>c.deadline){
+      c.done=true; c.failed=true;
+      money=Math.max(0,money-c.penalty);
+      showNotify('CONTRACT FAILED! -'+fmt(c.penalty),'#e53935');
+    }
+  });
+}
+
+// ── RANDOM EVENTS ─────────────────────────────────────────────────────────────
+var EVENT_POOL=[
+  {id:'strike',title:'WORKERS STRIKE',body:'Workers are demanding better conditions. Accept their demands (+$2/s salary cost for 3 days) or face 40% productivity loss?',
+    optA:{label:'ACCEPT',fn:function(){activeLaws.push({id:'strike_accept',name:'Worker Agreement',desc:'+$2/s cost for 3 days',expiresDay:gameDay+3,effect:{tax:1.15}});showNotify('Workers satisfied.','#6dbf6d');}},
+    optB:{label:'REFUSE',fn:function(){activeLaws.push({id:'strike_refuse',name:'Strike Action',desc:'40% productivity penalty for 2 days',expiresDay:gameDay+2,effect:{rate:.6}});showNotify('Strike begins!','#e53935');}}},
+  {id:'taxbreak',title:'TAX INCENTIVE',body:'The government is offering a 25% tax reduction for certified manufacturers. Accept? (free)',
+    optA:{label:'CLAIM',fn:function(){activeLaws.push({id:'taxbreak',name:'Tax Incentive',desc:'25% tax reduction for 4 days',expiresDay:gameDay+4,effect:{tax:.75}});showNotify('Tax break applied!','#f5a400');}},
+    optB:{label:'IGNORE',fn:function(){}}},
+  {id:'boom',title:'MARKET BOOM',body:'Unexpected demand surge detected! Your current product\'s market value has spiked. The boom lasts 3 days.',
+    optA:{label:'EXPLOIT IT',fn:function(){market[currentProduct].price*=2;market[currentProduct].demand*=1.5;activeLaws.push({id:'boom',name:'Market Boom',desc:'Current product price doubled for 3 days',expiresDay:gameDay+3,effect:{value:2}});showNotify('MARKET BOOM!','#f5a400');}},
+    optB:{label:'IGNORE',fn:function(){}}},
+  {id:'inspection',title:'SAFETY INSPECTION',body:'Regulators are conducting a safety inspection. Pass with $0 cost if your factory is standard, or bribe the inspector for $500?',
+    optA:{label:'BRIBE $500',fn:function(){if(money>=500){money-=500;showNotify('Inspection cleared. ($500)','#e53935');}else showNotify('Not enough cash! Failed.','#e53935');}},
+    optB:{label:'LET THEM IN',fn:function(){if(Math.random()>.4){showNotify('Inspection passed!','#6dbf6d');}else{var fine=Math.floor(500+Math.random()*1000);money=Math.max(0,money-fine);showNotify('FINE: -'+fmt(fine),'#e53935');}}}},
+  {id:'competitor',title:'COMPETITOR UNDERCUT',body:'A competitor has flooded the market with your product. Its price drops 35% for 4 days. Diversify or hold?',
+    optA:{label:'DIVERSIFY',fn:function(){showNotify('Switch product focus to adapt!','#6dbf6d');}},
+    optB:{label:'HOLD POSITION',fn:function(){market[currentProduct].price*=.65;activeLaws.push({id:'undercut',name:'Price War',desc:'Current product -35% price for 4 days',expiresDay:gameDay+4,effect:{value:.65}});showNotify('Price war engaged!','#e53935');}}}
+];
+
+function spawnRandomEvent(){
+  if(pendingEvent) return;
+  var pool=EVENT_POOL;
+  var e=pool[Math.floor(Math.random()*pool.length)];
+  pendingEvent=e;
+  showEventModal(e);
+}
+
+function showEventModal(e){
+  document.getElementById('em-title').textContent=e.title;
+  document.getElementById('em-body').textContent=e.body;
+  var btns=document.getElementById('em-btns');
+  btns.innerHTML='';
+  var bA=document.createElement('button');
+  bA.className='em-btn primary'; bA.textContent=e.optA.label;
+  bA.onclick=function(){e.optA.fn();closeEvent();};
+  var bB=document.createElement('button');
+  bB.className='em-btn secondary'; bB.textContent=e.optB.label;
+  bB.onclick=function(){e.optB.fn();closeEvent();};
+  btns.appendChild(bA); btns.appendChild(bB);
+  document.getElementById('event-modal').classList.add('show');
+}
+
+function closeEvent(){
+  document.getElementById('event-modal').classList.remove('show');
+  pendingEvent=null;
+}
+
+// ── WORKERS ───────────────────────────────────────────────────────────────────
+function hireWorker(type){
+  var wt=WORKER_TYPES.find(function(w){return w.id===type;});
+  var cost=Math.floor(wt.salary*DAY_DURATION*3); // 3 days upfront
+  if(money<cost){showNotify('NEED '+fmt(cost)+' TO HIRE','#e53935');return;}
+  money-=cost;
+  workers.push({type:type,id:Date.now()});
+  showNotify(wt.name+' HIRED');
+  renderStaffPanel();
+  updateHUDBar(getProductionRate()*getUnitValue(), getDailyExpense()/DAY_DURATION);
+}
+
+function fireWorker(type){
+  var idx=workers.findIndex(function(w){return w.type===type;});
+  if(idx===-1) return;
+  workers.splice(idx,1);
+  showNotify('WORKER FIRED');
+  renderStaffPanel();
+  updateHUDBar(getProductionRate()*getUnitValue(), getDailyExpense()/DAY_DURATION);
+}
+
+// ── INVESTMENTS ───────────────────────────────────────────────────────────────
+function invest(typeId, amount){
+  if(isNaN(amount)||amount<=0){showNotify('INVALID AMOUNT','#e53935');return;}
+  if(money<amount){showNotify('NOT ENOUGH CASH','#e53935');return;}
+  var it=INVEST_TYPES.find(function(t){return t.id===typeId;});
+  money-=amount;
+  var retMult;
+  if(typeId==='startup') retMult=Math.random()>.5?it.retMax:it.retMin;
+  else retMult=it.retMin+Math.random()*(it.retMax-it.retMin);
+  investments.push({type:typeId,amount:amount,matures:gameDay+it.days,retMult:retMult,done:false});
+  showNotify('INVESTED '+fmt(amount)+' IN '+it.name.toUpperCase(),'#b39ddb');
+  renderFinancePanel();
+}
+
+// ── MACHINE PLACEMENT ─────────────────────────────────────────────────────────
+function canPlaceMachine(def,col,row){
+  if(col<0||col+def.w>COLS||row<0||row+def.h>ROWS) return false;
+  for(var dc=0;dc<def.w;dc++){for(var dr=0;dr<def.h;dr++){
+    var k=(col+dc)+','+(row+dr);
+    if(placed[k]||conveyors[k]) return false;
+  }}
+  return true;
+}
+
+function getMachineCost(id){
+  var def=MACHINES[id];
+  var engCount=workers.filter(function(w){return w.type==='engineer';}).length;
+  return Math.ceil(def.cost*(1-Math.min(.5,engCount*0.08)));
+}
+
+function placeMachine(id,col,row){
+  var def=MACHINES[id];
+  if(!canPlaceMachine(def,col,row)){showNotify('CANNOT PLACE HERE');return false;}
+  var cost=getMachineCost(id);
+  if(money<cost){showNotify('NOT ENOUGH CASH');return false;}
+  money-=cost;
+  def.cost=Math.ceil(def.cost*1.15); // price scaling
+  var m={id:id,col:col,row:row,w:def.w,h:def.h,flash:0,
+    inBuf:{},outBuf:{},srcTimer:0,
+    processing:false,processTimer:0,processRecipe:null};
+  for(var dc=0;dc<def.w;dc++){for(var dr=0;dr<def.h;dr++){
+    placed[(col+dc)+','+(row+dr)]=m;
+  }}
+  renderBuildPanel();
+  return true;
+}
+
+function removeMachine(col,row){
+  var m=getMachineAt(col,row);
+  if(!m) return;
+  var def=MACHINES[m.id];
+  var refund=Math.floor(def.baseCost*.5);
+  money+=refund;
+  for(var dc=0;dc<m.w;dc++){for(var dr=0;dr<m.h;dr++){
+    delete placed[(m.col+dc)+','+(m.row+dr)];
+  }}
+  showNotify('REFUNDED '+fmt(refund));
+}
+
+function placeConveyor(col,row,dir){
+  if(col<0||col>=COLS||row<0||row>=ROWS) return;
+  var k=col+','+row;
+  if(placed[k]) return;
+  conveyors[k]={col:col,row:row,dir:dir||'r',buf:{}};
+}
+
+function removeAt(col,row){
+  var k=col+','+row;
+  if(placed[k]) removeMachine(col,row);
+  else if(conveyors[k]) delete conveyors[k];
+}
+
+function getMachineAt(col,row){
+  return placed[col+','+row]||null;
+}
+
+function screenToGrid(sx,sy){
+  return{col:Math.floor((sx-camX)/CELL),row:Math.floor((sy-camY)/CELL)};
+}
+
+// ── UPGRADES ──────────────────────────────────────────────────────────────────
+function buyUpgrade(id){
+  var u=UPGRADES.find(function(x){return x.id===id;});
+  if(!u||u.bought||money<u.cost) return;
+  money-=u.cost;
+  u.bought=true;
+  if(u.mult.rate) speedMult*=u.mult.rate;
+  if(u.mult.value) valueMult*=u.mult.value;
+  renderUpgradesPanel();
+  showNotify('UPGRADE: '+u.name.toUpperCase());
+}
+
+// ── TIER ──────────────────────────────────────────────────────────────────────
+function checkTier(){
+  if(tier>=TIERS.length-1) return;
+  if(totalEarned>=TIERS[tier].goal){
+    tier++;
+    document.getElementById('ts-title').textContent=TIERS[tier].name.toUpperCase();
+    document.getElementById('ts-sub').textContent='New machines & products unlocked!';
+    document.getElementById('tier-screen').classList.add('show');
+    renderBuildPanel(); renderMarketPanel(); renderUpgradesPanel(); renderExpandPanel();
+  }
+}
+
+function closeTierScreen(){
+  document.getElementById('tier-screen').classList.remove('show');
+  showNotify('TIER '+tier+': '+TIERS[tier].name.toUpperCase());
+}
+
+// ── HUD BAR ───────────────────────────────────────────────────────────────────
+function updateHUDBar(income, expense){
+  income=income||0;
+  expense=expense||(getDailyExpense()/DAY_DURATION);
+  document.getElementById('money-display').textContent=fmt(money);
+  document.getElementById('rate-display').textContent=income>0?'+'+fmt(income)+'/s':'(chain idle)';
+  document.getElementById('expense-display').textContent='-'+fmt(expense)+'/s';
+  var passive=getPassiveIncome();
+  var pd=document.getElementById('passive-display');
+  if(pd) pd.textContent=passive>0?'+'+fmt(passive)+'/s':'—';
+}
+
+// ── TOOL ──────────────────────────────────────────────────────────────────────
+function setTool(t){
+  currentTool=t;
+  if(t!=='select') selectedMachine=null;
+  document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active-tool');});
+  document.getElementById('tool-'+t).classList.add('active-tool');
+  var hints={select:'Select machine then click grid to place',conveyor:'Click to place conveyor; R=rotate; right-click to rotate',delete:'Click machine or conveyor to remove (50% refund)'};
+  document.getElementById('tool-hint').textContent=hints[t]||'';
+  document.querySelectorAll('.shop-card').forEach(function(c){c.classList.remove('selected');});
+}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(function(t,i){
+    t.classList.toggle('active',['build','market','guide','staff','finance','upgrades','expand'][i]===tab);
+  });
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+tab).classList.add('active');
+  if(tab==='guide') renderGuidePanel();
+  else if(tab==='build') renderBuildPanel();
+  else if(tab==='market') renderMarketPanel();
+  else if(tab==='staff') renderStaffPanel();
+  else if(tab==='finance') renderFinancePanel();
+  else if(tab==='upgrades') renderUpgradesPanel();
+  else if(tab==='expand') renderExpandPanel();
+}
+
+// ── DRAW ──────────────────────────────────────────────────────────────────────
+function draw(){
+  var W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#1e1e1e';
+  ctx.fillRect(0,0,W,H);
+
+  var startCol=Math.floor(-camX/CELL)-1, startRow=Math.floor(-camY/CELL)-1;
+  var endCol=startCol+Math.ceil(W/CELL)+2, endRow=startRow+Math.ceil(H/CELL)+2;
+  ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=1;
+  for(var c=startCol;c<endCol;c++){
+    for(var r=startRow;r<endRow;r++){
+      var px=c*CELL+camX, py=r*CELL+camY;
+      if(c>=0&&c<COLS&&r>=0&&r<ROWS){
+        ctx.fillStyle='#232323';
+        ctx.fillRect(px,py,CELL,CELL);
+        if((c+r)%3===0){ctx.fillStyle='rgba(255,255,255,.012)';ctx.fillRect(px+1,py+1,CELL-2,CELL-2);}
+      }
+      ctx.strokeRect(px,py,CELL,CELL);
+    }
+  }
+  ctx.strokeStyle='#f5a400'; ctx.lineWidth=2;
+  ctx.strokeRect(camX,camY,COLS*CELL,ROWS*CELL);
+
+  Object.values(conveyors).forEach(drawConveyor);
+
+  var drawn=new Set();
+  Object.values(placed).forEach(function(m){
+    var k=m.col+':'+m.row; if(drawn.has(k)) return; drawn.add(k);
+    drawMachine(m);
+  });
+
+  if(selectedMachine&&currentTool==='select'&&ghostX!=null){
+    var gp=screenToGrid(ghostX,ghostY);
+    var def=MACHINES[selectedMachine];
+    if(gp){
+      var ok=canPlaceMachine(def,gp.col,gp.row);
+      ctx.globalAlpha=.45;
+      drawMachineAt(def,gp.col,gp.row,false,ok?'#4a9a4a':'#9a2a2a');
+      ctx.globalAlpha=1;
+    }
+  }
+
+  if(currentTool==='conveyor'&&ghostX!=null){
+    var gp2=screenToGrid(ghostX,ghostY);
+    if(gp2&&gp2.col>=0&&gp2.col<COLS&&gp2.row>=0&&gp2.row<ROWS){
+      ctx.globalAlpha=.5; ctx.fillStyle='#7a5a00';
+      ctx.fillRect(gp2.col*CELL+camX+2,gp2.row*CELL+camY+2,CELL-4,CELL-4);
+      ctx.globalAlpha=1;
+    }
+  }
+}
+
+function drawItemDots(buf,px,py,rightAlign){
+  if(!buf) return;
+  var items2=[];
+  Object.keys(buf).forEach(function(type){for(var i=0;i<Math.min(buf[type],5);i++)items2.push(type);});
+  items2.forEach(function(type,i){
+    var col=(ITEMS[type]&&ITEMS[type].col)||'#aaa';
+    ctx.fillStyle=col;
+    ctx.strokeStyle='rgba(0,0,0,.5)';
+    ctx.lineWidth=0.5;
+    ctx.beginPath();
+    ctx.arc(px+(rightAlign?-i*7:i*7),py,3.5,0,Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  });
+}
+
+function drawMachine(m){
+  if(!MACHINES[m.id]) return; // guard against stale machines from old save
+  var def=MACHINES[m.id];
+  drawMachineAt(def,m.col,m.row,m.flash>0,null);
+  var px=m.col*CELL+camX, py=m.row*CELL+camY;
+  var pw=def.w*CELL-8;
+
+  // Progress bar at bottom
+  if(def.type==='source'){
+    var srcInterval=1/def.rate;
+    var srcProg=Math.min(1,(m.srcTimer||0)/srcInterval);
+    ctx.fillStyle='#1a2a10'; ctx.fillRect(px+4,py+def.h*CELL-8,pw,4);
+    ctx.fillStyle='#4a9a20'; ctx.fillRect(px+4,py+def.h*CELL-8,pw*srcProg,4);
+  } else if(m.processing&&m.processRecipe){
+    var recTime=m.processRecipe.time/speedMult;
+    var prog=Math.max(0,1-m.processTimer/recTime);
+    ctx.fillStyle='#1a1a10'; ctx.fillRect(px+4,py+def.h*CELL-8,pw,4);
+    ctx.fillStyle=def.type==='assembly'?'#1e88e5':'#f5a400';
+    ctx.fillRect(px+4,py+def.h*CELL-8,pw*prog,4);
+  } else {
+    ctx.fillStyle='#111'; ctx.fillRect(px+4,py+def.h*CELL-8,pw,4);
+  }
+
+  // Output buffer dots (bottom-left)
+  drawItemDots(m.outBuf, px+8, py+def.h*CELL-14, false);
+  // Input buffer dots (top-right, right-aligned)
+  drawItemDots(m.inBuf, px+def.w*CELL-8, py+10, true);
+}
+
+function drawMachineAt(def,col,row,flash,borderOverride){
+  var px=col*CELL+camX, py=row*CELL+camY;
+  var w=def.w*CELL, h=def.h*CELL;
+  ctx.fillStyle=flash?'#3a5a7a':def.color;
+  ctx.fillRect(px+2,py+2,w-4,h-4);
+  ctx.strokeStyle=borderOverride||def.border; ctx.lineWidth=flash?2.5:1.5;
+  ctx.strokeRect(px+2,py+2,w-4,h-4);
+  ctx.fillStyle=borderOverride||def.border;
+  [[px+5,py+5],[px+w-7,py+5],[px+5,py+h-7],[px+w-7,py+h-7]].forEach(function(pt){
+    ctx.beginPath();ctx.arc(pt[0],pt[1],2,0,Math.PI*2);ctx.fill();
+  });
+  ctx.font=(w>80?'20px':'16px')+' serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(def.icon,px+w/2,py+h/2-5);
+  ctx.font='bold 7px Courier New'; ctx.fillStyle='rgba(255,255,255,.65)';
+  ctx.fillText(def.name.toUpperCase(),px+w/2,py+h/2+9);
+  ctx.textAlign='left';
+}
+
+function drawConveyor(cv){
+  var px=cv.col*CELL+camX, py=cv.row*CELL+camY;
+  var cx2=px+CELL/2, cy2=py+CELL/2;
+  // Belt tracks
+  ctx.fillStyle='#302400'; ctx.fillRect(px+4,py+4,CELL-8,CELL-8);
+  ctx.strokeStyle='#685010'; ctx.lineWidth=1; ctx.strokeRect(px+4,py+4,CELL-8,CELL-8);
+  // Direction arrow
+  ctx.strokeStyle='#f5a400'; ctx.lineWidth=1.5; ctx.beginPath();
+  var as=7;
+  if(cv.dir==='r'){ctx.moveTo(cx2-as,cy2);ctx.lineTo(cx2+as,cy2);ctx.lineTo(cx2+as-4,cy2-3);ctx.moveTo(cx2+as,cy2);ctx.lineTo(cx2+as-4,cy2+3);}
+  else if(cv.dir==='l'){ctx.moveTo(cx2+as,cy2);ctx.lineTo(cx2-as,cy2);ctx.lineTo(cx2-as+4,cy2-3);ctx.moveTo(cx2-as,cy2);ctx.lineTo(cx2-as+4,cy2+3);}
+  else if(cv.dir==='d'){ctx.moveTo(cx2,cy2-as);ctx.lineTo(cx2,cy2+as);ctx.lineTo(cx2-3,cy2+as-4);ctx.moveTo(cx2,cy2+as);ctx.lineTo(cx2+3,cy2+as-4);}
+  else{ctx.moveTo(cx2,cy2+as);ctx.lineTo(cx2,cy2-as);ctx.lineTo(cx2-3,cy2-as+4);ctx.moveTo(cx2,cy2-as);ctx.lineTo(cx2+3,cy2-as+4);}
+  ctx.stroke();
+  // Items on belt
+  if(cv.buf){
+    var all=[];
+    Object.keys(cv.buf).forEach(function(type){for(var i=0;i<Math.min(cv.buf[type],3);i++)all.push(type);});
+    all.forEach(function(type,i){
+      var col2=(ITEMS[type]&&ITEMS[type].col)||'#aaa';
+      ctx.fillStyle=col2;
+      ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=0.5;
+      ctx.beginPath();
+      ctx.arc(px+8+i*8,py+CELL-10,4,0,Math.PI*2);
+      ctx.fill(); ctx.stroke();
+    });
+  }
+}
+
+// ── GUIDE ─────────────────────────────────────────────────────────────────────
+function getProducerOf(itemType){
+  var result=null;
+  Object.values(MACHINES).forEach(function(def){
+    if(result) return;
+    if(def.type==='source'&&def.out===itemType) result={machine:def,recipe:null};
+    else if(def.type==='processor') def.recipes.forEach(function(r){
+      if(!result&&r.out[itemType]) result={machine:def,recipe:r};
+    });
+  });
+  return result;
+}
+
+function buildChain(itemType,depth){
+  depth=depth||0; if(depth>4) return [];
+  var p=getProducerOf(itemType); if(!p) return [];
+  var steps=[];
+  if(p.recipe) Object.keys(p.recipe.in).forEach(function(inp){
+    buildChain(inp,depth+1).forEach(function(s){
+      if(!steps.find(function(x){return x.machine.id===s.machine.id&&JSON.stringify(x.recipe)===JSON.stringify(s.recipe);}))
+        steps.push(s);
+    });
+  });
+  if(!steps.find(function(x){return x.machine.id===p.machine.id&&JSON.stringify(x.recipe)===JSON.stringify(p.recipe);}))
+    steps.push({machine:p.machine,recipe:p.recipe,produces:itemType});
+  return steps;
+}
+
+function renderGuidePanel(){
+  var panel=document.getElementById('panel-guide');
+  if(!panel) return;
+  panel.innerHTML='';
+
+  var prod=PRODUCTS[currentProduct];
+  var pr=PRODUCT_RECIPES[currentProduct];
+  var mk=market[currentProduct];
+
+  // Header card
+  var hdr=document.createElement('div');
+  hdr.style.cssText='background:#0a1a0a;border:1px solid #1a4a1a;border-radius:3px;padding:10px 12px;margin-bottom:6px;';
+  hdr.innerHTML=
+    '<div style="font-size:8px;letter-spacing:3px;color:var(--dim);margin-bottom:3px">HOW TO MAKE</div>'+
+    '<div style="display:flex;align-items:center;gap:8px">'+
+      '<span style="font-size:22px">'+prod.icon+'</span>'+
+      '<div><div style="font-size:14px;font-weight:700">'+prod.name+'</div>'+
+        '<div style="font-size:9px;color:#f5a400">'+fmt(mk.price)+'/unit · '+
+          (pr?pr.time+'s per unit':'no recipe')+'</div>'+
+        '<div style="font-size:9px;color:var(--dim)">'+prod.desc+'</div>'+
+      '</div>'+
+    '</div>';
+  panel.appendChild(hdr);
+
+  if(!pr){
+    var na=document.createElement('div');
+    na.style.cssText='font-size:9px;color:var(--dim);padding:10px;text-align:center;';
+    na.textContent='No recipe available yet.'; panel.appendChild(na); return;
+  }
+
+  // Assembly recipe summary
+  var assecSec=document.createElement('div');assecSec.className='psec';assecSec.textContent='ASSEMBLY INPUTS (per unit)';panel.appendChild(assecSec);
+  var assemCard=document.createElement('div');
+  assemCard.style.cssText='background:#00081e;border:1px solid #1e4a7a;border-radius:3px;padding:8px 10px;margin-bottom:6px;';
+  var inpHtml=Object.keys(pr.in).map(function(t){
+    var col=(ITEMS[t]&&ITEMS[t].col)||'#aaa';
+    return '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 6px 2px 0;">'+
+      '<span style="width:9px;height:9px;border-radius:50%;background:'+col+';display:inline-block;flex-shrink:0"></span>'+
+      '<b>'+pr.in[t]+'×</b>&nbsp;'+t.replace(/_/g,' ')+
+      '</span>';
+  }).join('');
+  assemCard.innerHTML=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'+
+      '<span style="font-size:16px">🏭</span>'+
+      '<span style="font-size:10px;font-weight:700;color:#5baef5">Assembly Machine</span>'+
+    '</div>'+
+    '<div style="font-size:9px;line-height:1.9">'+inpHtml+'</div>'+
+    '<div style="font-size:8px;color:var(--dim);margin-top:3px">→ outputs 1× '+prod.name+' for sale</div>';
+  panel.appendChild(assemCard);
+
+  // Per-material chains
+  var chainSec=document.createElement('div');chainSec.className='psec';chainSec.textContent='PRODUCTION CHAINS';panel.appendChild(chainSec);
+
+  // Deduplicate chains across all required materials
+  var allSteps=[];
+  Object.keys(pr.in).forEach(function(itemType){
+    buildChain(itemType).forEach(function(s){
+      if(!allSteps.find(function(x){return x.machine.id===s.machine.id&&JSON.stringify(x.recipe)===JSON.stringify(s.recipe);}))
+        allSteps.push(s);
+    });
+  });
+
+  // Group: sources first, then processors
+  var sources=allSteps.filter(function(s){return s.machine.type==='source';});
+  var procs=allSteps.filter(function(s){return s.machine.type==='processor';});
+
+  function stepCard(step,idx,total){
+    var def=step.machine;
+    var itemCol=step.recipe?
+      (ITEMS[Object.keys(step.recipe.out)[0]]&&ITEMS[Object.keys(step.recipe.out)[0]].col)||'#aaa':
+      (ITEMS[def.out]&&ITEMS[def.out].col)||'#aaa';
+    var recDesc=step.recipe?
+      Object.keys(step.recipe.in).map(function(t){return step.recipe.in[t]+'× '+t.replace(/_/g,' ');}).join(' + ')+
+      ' → '+Object.keys(step.recipe.out).map(function(t){return step.recipe.out[t]+'× '+t.replace(/_/g,' ');}).join('+')+
+      ' ('+step.recipe.time+'s)':
+      'generates '+def.out.replace(/_/g,' ')+' at '+def.rate+'/s';
+    var card2=document.createElement('div');
+    card2.style.cssText='background:#111;border:1px solid #2a2a2a;border-radius:3px;padding:7px 9px;margin-bottom:3px;display:flex;align-items:flex-start;gap:8px;';
+    card2.innerHTML=
+      '<div style="width:20px;height:20px;border-radius:2px;background:'+def.color+';border:1px solid '+def.border+
+        ';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">'+def.icon+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:9px;font-weight:700;color:#ddd">'+def.name+
+          '<span style="color:'+def.border+';margin-left:5px;font-weight:400">'+def.w+'×'+def.h+'</span></div>'+
+        '<div style="font-size:8px;color:var(--dim);margin-top:1px;word-break:break-word">'+recDesc+'</div>'+
+      '</div>'+
+      '<span style="width:9px;height:9px;border-radius:50%;background:'+itemCol+';flex-shrink:0;margin-top:3px"></span>';
+    panel.appendChild(card2);
+    if(idx<total-1){
+      var arr=document.createElement('div');
+      arr.style.cssText='font-size:9px;color:#685010;padding-left:30px;margin:-1px 0;';
+      arr.textContent='↓ conveyor belt ↓';
+      panel.appendChild(arr);
+    }
+  }
+
+  if(sources.length){
+    var srcLabel=document.createElement('div');
+    srcLabel.style.cssText='font-size:8px;letter-spacing:2px;color:#4a8a20;padding:4px 2px 2px;';
+    srcLabel.textContent='① RAW SOURCES';panel.appendChild(srcLabel);
+    sources.forEach(function(s,i){stepCard(s,i,sources.length);});
+    var cv1=document.createElement('div');
+    cv1.style.cssText='font-size:9px;color:#685010;padding-left:4px;margin:2px 0;';
+    cv1.textContent='↓ conveyor belt ↓';panel.appendChild(cv1);
+  }
+  if(procs.length){
+    var procLabel=document.createElement('div');
+    procLabel.style.cssText='font-size:8px;letter-spacing:2px;color:#7a5020;padding:4px 2px 2px;';
+    procLabel.textContent='② PROCESSORS';panel.appendChild(procLabel);
+    procs.forEach(function(s,i){stepCard(s,i,procs.length);});
+    var cv2=document.createElement('div');
+    cv2.style.cssText='font-size:9px;color:#685010;padding-left:4px;margin:2px 0;';
+    cv2.textContent='↓ conveyor belt ↓';panel.appendChild(cv2);
+  }
+
+  // Assembly reminder
+  var asmEnd=document.createElement('div');
+  asmEnd.style.cssText='background:#00081e;border:1px solid #1e4a7a;border-radius:3px;padding:6px 9px;margin-top:2px;display:flex;align-items:center;gap:8px;';
+  asmEnd.innerHTML='<span style="font-size:15px">🏭</span>'+
+    '<span style="font-size:9px;font-weight:700;color:#5baef5">③ ASSEMBLY → '+prod.name+' (outputs to belt)</span>';
+  panel.appendChild(asmEnd);
+  var repoEnd=document.createElement('div');
+  repoEnd.style.cssText='background:#001a10;border:1px solid #1a5a30;border-radius:3px;padding:6px 9px;margin-top:4px;display:flex;align-items:center;gap:8px;';
+  repoEnd.innerHTML='<span style="font-size:15px">🏦</span>'+
+    '<span style="font-size:9px;font-weight:700;color:#20c070">④ REPOSITORY → auto-sells by demand</span>';
+  panel.appendChild(repoEnd);
+
+  // Tips
+  var tipSec=document.createElement('div');tipSec.className='psec';tipSec.textContent='TIPS';panel.appendChild(tipSec);
+  var tips=[
+    'Press C for conveyor tool · R to rotate direction',
+    'Furnace auto-picks recipe based on what arrives',
+    'Assembly outputs product to belt — connect to Repository to sell',
+    'Repository sells faster when market demand is high',
+    'Build more sources to feed faster processors',
+    'Hover any machine to see buffer state',
+  ];
+  var tipEl=document.createElement('div');
+  tipEl.style.cssText='background:#111;border:1px solid #2a2a2a;border-radius:3px;padding:8px 10px;';
+  tipEl.innerHTML=tips.map(function(t){
+    return '<div style="font-size:8px;color:var(--dim);margin-bottom:4px;line-height:1.4">• '+t+'</div>';
+  }).join('');
+  panel.appendChild(tipEl);
+
+  // All products index
+  var allSec=document.createElement('div');allSec.className='psec';allSec.textContent='ALL PRODUCTS';panel.appendChild(allSec);
+  Object.keys(PRODUCTS).forEach(function(pid){
+    var p2=PRODUCTS[pid];var pr2=PRODUCT_RECIPES[pid];var locked=p2.tierReq>tier;
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 7px;margin-bottom:3px;'+
+      'background:'+(pid===currentProduct?'#0a1e0a':'#111')+';'+
+      'border:1px solid '+(pid===currentProduct?'#1a5a1a':'#2a2a2a')+';border-radius:3px;cursor:'+(locked?'default':'pointer')+';opacity:'+(locked?'.4':'1')+';';
+    var recipe=pr2?Object.keys(pr2.in).map(function(t){return pr2.in[t]+'×'+t.replace(/_/g,' ');}).join('+'):'—';
+    row.innerHTML=
+      '<span style="font-size:14px">'+p2.icon+'</span>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:9px;font-weight:700">'+p2.name+
+          (locked?' <span style="color:var(--dim);font-weight:400;font-size:8px">[tier '+(p2.tierReq+1)+']</span>':'')+
+        '</div>'+
+        '<div style="font-size:8px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+recipe+'</div>'+
+      '</div>'+
+      (pid===currentProduct?'<span style="font-size:8px;color:#4caf50">● FOCUS</span>':'');
+    if(!locked&&pid!==currentProduct) row.onclick=function(){setFocus(pid);};
+    panel.appendChild(row);
+  });
+}
+
+// ── PANELS ────────────────────────────────────────────────────────────────────
+function renderBuildPanel(){
+  var panel=document.getElementById('panel-build');
+  panel.innerHTML='';
+
+  // Hint
+  var hint=document.createElement('div');
+  hint.style.cssText='font-size:8px;color:var(--dim);padding:6px 8px 4px;line-height:1.5;';
+  hint.textContent='Chain: Source → Conveyor → Processor → Conveyor → Assembly → Conveyor → Repository';
+  panel.appendChild(hint);
+
+  var groups=[
+    {label:'Sources (no input)',ids:['iron_mine','copper_mine','lumber','sand_pit','cotton_farm']},
+    {label:'Processing',ids:['furnace','sawmill','wire_drawer','press','loom','circuit_mk']},
+    {label:'Assembly & Sales',ids:['assembly','repository']},
+    {label:'Automation (Tier 2)',ids:['cnc','robot_arm']},
+  ];
+
+  groups.forEach(function(g){
+    var avail=g.ids.filter(function(id){return MACHINES[id]&&MACHINES[id].tierReq<=tier;});
+    var locked=g.ids.filter(function(id){return MACHINES[id]&&MACHINES[id].tierReq>tier;});
+    if(!avail.length&&!locked.length) return;
+
+    var sec=document.createElement('div');
+    sec.className='psec'; sec.textContent=g.label; panel.appendChild(sec);
+
+    avail.forEach(function(id){
+      var def=MACHINES[id];
+      var cost=getMachineCost(id);
+      var card=document.createElement('div');
+      card.className='shop-card'+(selectedMachine===id?' selected':'');
+
+      // Build recipe line
+      var recLine='';
+      if(def.type==='source'){
+        recLine='→ '+def.out.replace(/_/g,' ')+' @ '+def.rate+'/s';
+      } else if(def.type==='processor'){
+        recLine=def.recipes.map(function(r){
+          var ins=Object.keys(r.in).map(function(t){return r.in[t]+'×'+t.replace(/_/g,' ');}).join('+');
+          var outs=Object.keys(r.out).map(function(t){return r.out[t]+'×'+t.replace(/_/g,' ');}).join('+');
+          return ins+' → '+outs+' ('+r.time+'s)';
+        }).join(' | ');
+      } else if(def.type==='assembly'){
+        var pr=PRODUCT_RECIPES[currentProduct];
+        if(pr){
+          recLine='Making '+PRODUCTS[currentProduct].name+': '+
+            Object.keys(pr.in).map(function(t){return pr.in[t]+'×'+t.replace(/_/g,' ');}).join('+')+' → outputs to belt';
+        } else recLine='Select a product in MARKET tab';
+      } else if(def.type==='repository'){
+        recLine='Accepts any finished product. Auto-sells; rate scales with market demand.';
+      }
+
+      card.innerHTML=
+        '<div class="sc-header">'+
+          '<div class="sc-icon" style="background:'+def.color+';border:1px solid '+def.border+'">'+def.icon+'</div>'+
+          '<div style="flex:1"><div class="sc-name">'+def.name+'</div>'+
+            '<div style="font-size:7px;color:'+def.border+'">'+def.w+'×'+def.h+' cells</div></div>'+
+          '<span style="font-size:10px;font-weight:700;color:'+(money>=cost?'#f5a400':'#e53935')+'">'+fmt(cost)+'</span>'+
+        '</div>'+
+        '<div style="font-size:8px;color:var(--dim);margin:2px 0 4px;line-height:1.4">'+recLine+'</div>';
+
+      card.onclick=function(){
+        selectedMachine=id; setTool('select');
+        document.querySelectorAll('.shop-card').forEach(function(c){c.classList.remove('selected');});
+        card.classList.add('selected');
+      };
+      panel.appendChild(card);
+    });
+
+    locked.forEach(function(id){
+      var def=MACHINES[id];
+      var card=document.createElement('div');
+      card.className='shop-card locked';
+      card.innerHTML=
+        '<div class="sc-header">'+
+          '<div class="sc-icon" style="background:#111;border:1px solid #333">'+def.icon+'</div>'+
+          '<div class="sc-name">'+def.name+'</div>'+
+          '<div class="sc-badge">TIER '+(def.tierReq+1)+'</div>'+
+        '</div>';
+      panel.appendChild(card);
+    });
+  });
+}
+
+function renderMarketPanel(){
+  var panel=document.getElementById('panel-market');
+  panel.innerHTML='';
+
+  // Current focus indicator
+  var p=PRODUCTS[currentProduct];
+  var m=market[currentProduct];
+  var ov=priceOverride[currentProduct]||1.0;
+  var effectivePrice=m.price*ov*effValue();
+  var focusEl=document.createElement('div');
+  focusEl.style.cssText='background:#201800;border:1px solid #4a3000;border-radius:3px;padding:8px 11px;margin-bottom:2px;';
+  focusEl.innerHTML='<div style="font-size:8px;letter-spacing:3px;color:var(--dim);margin-bottom:4px">CURRENT FOCUS</div>'+
+    '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">'+p.icon+'</span>'+
+    '<div><div style="font-size:13px;font-weight:700">'+p.name+'</div>'+
+    '<div style="font-size:10px;color:#f5a400;font-weight:700">Market: '+fmt(m.price)+'/unit &nbsp;'+
+    (m.trend>0?'▲':m.trend<0?'▼':'—')+'</div>'+
+    '<div style="font-size:10px;color:#7fd87f;font-weight:700">Your Price: '+fmt(effectivePrice)+'/unit</div>'+
+    '</div></div>'+
+    '<div style="margin-top:8px;">'+
+      '<div style="display:flex;justify-content:space-between;font-size:8px;letter-spacing:1px;color:var(--dim);margin-bottom:3px">'+
+        '<span>SELL PRICE MULTIPLIER</span>'+
+        '<span id="ov-label" style="color:'+(ov>1?'#6dbf6d':ov<1?'#e08020':'#f5a400')+'">'+
+          (ov>1?'+':'')+Math.round((ov-1)*100)+'%</span>'+
+      '</div>'+
+      '<input id="price-slider" type="range" min="50" max="200" step="5" value="'+Math.round(ov*100)+'" '+
+        'style="width:100%;height:6px;accent-color:#f5a400;cursor:pointer">'+
+      '<div style="display:flex;justify-content:space-between;font-size:7px;color:var(--dim);margin-top:2px">'+
+        '<span>50%</span><span>100%</span><span>200%</span>'+
+      '</div>'+
+    '</div>';
+  panel.appendChild(focusEl);
+  // Tag the effective price span BEFORE wiring the slider so querySelector works
+  var effPriceEl=focusEl.querySelector('div[style*="7fd87f"]');
+  if(effPriceEl) effPriceEl.className='focus-eff-price';
+  var slider=focusEl.querySelector('#price-slider');
+  var ovLabel=focusEl.querySelector('#ov-label');
+  if(slider) slider.addEventListener('input',function(){
+    var val=parseInt(this.value)/100;
+    priceOverride[currentProduct]=val;
+    var pct=Math.round((val-1)*100);
+    if(ovLabel){ ovLabel.textContent=(pct>0?'+':'')+pct+'%'; ovLabel.style.color=val>1?'#6dbf6d':val<1?'#e08020':'#f5a400'; }
+    var ep=market[currentProduct].price*val*effValue();
+    var el=focusEl.querySelector('.focus-eff-price');
+    if(el) el.textContent='Your Price: '+fmt(ep)+'/unit';
+  });
+
+  // Products
+  var sec=document.createElement('div');sec.className='psec';sec.textContent='PRODUCT MARKET';panel.appendChild(sec);
+  // Colour key
+  var key=document.createElement('div');
+  key.style.cssText='display:flex;gap:10px;padding:4px 6px 6px;font-size:8px;letter-spacing:1px;';
+  key.innerHTML=
+    '<span style="color:#e53935">■ LOW/NONE</span>'+
+    '<span style="color:#ff9800">■ MEDIUM</span>'+
+    '<span style="color:#4caf50">■ HIGH</span>';
+  panel.appendChild(key);
+  Object.keys(PRODUCTS).forEach(function(pid){
+    var prod=PRODUCTS[pid];
+    var mk=market[pid];
+    var locked=prod.tierReq&&prod.tierReq>tier;
+    var card=document.createElement('div');
+    card.className='prod-card'+(currentProduct===pid?' focused':'')+(locked?' locked':'');
+    card.style.opacity=locked?'.35':'1';
+    // Demand 0-100 → red (low) / orange (mid) / green (high)
+    var demandPct=Math.min(100,(mk.demand/prod.baseDemand)*100);
+    var demandCol=demandPct<33?'#e53935':demandPct<66?'#ff9800':'#4caf50';
+    var demandLbl=demandPct<33?'LOW':demandPct<66?'MED':'HIGH';
+    // Supply: how much the player's factory is covering vs demand (0 if not the focused product)
+    var supplyRate=currentProduct===pid?getProductionRate():0;
+    var supplyPct=Math.min(100,(supplyRate/Math.max(1,mk.demand))*100);
+    var supplyCol=supplyPct<10?'#e53935':supplyPct<45?'#ff9800':'#4caf50';
+    var supplyLbl=supplyPct<10?'NONE':supplyPct<45?'LOW':'HIGH';
+    var priceCol=mk.trend>0?'up':mk.trend<0?'down':'flat';
+    var trendSym=mk.trend>0?' ▲':mk.trend<0?' ▼':' —';
+    card.innerHTML=
+      '<div class="prod-header">'+
+        '<span class="prod-icon">'+prod.icon+'</span>'+
+        '<span class="prod-name">'+prod.name+'</span>'+
+        '<span class="prod-price '+priceCol+'">'+fmt(mk.price)+trendSym+'</span>'+
+      '</div>'+
+      '<div class="prod-bars">'+
+        '<div class="prod-bar-wrap">'+
+          '<div class="prod-bar-lbl" style="display:flex;justify-content:space-between">'+
+            '<span>DEMAND</span><span style="color:'+demandCol+'">'+demandLbl+'</span>'+
+          '</div>'+
+          '<div class="prod-bar"><div class="prod-bar-fill" style="width:'+demandPct+'%;background:'+demandCol+'"></div></div>'+
+        '</div>'+
+        '<div class="prod-bar-wrap">'+
+          '<div class="prod-bar-lbl" style="display:flex;justify-content:space-between">'+
+            '<span>YOUR SUPPLY</span><span style="color:'+supplyCol+'">'+supplyLbl+'</span>'+
+          '</div>'+
+          '<div class="prod-bar"><div class="prod-bar-fill" style="width:'+supplyPct+'%;background:'+supplyCol+'"></div></div>'+
+        '</div>'+
+      '</div>'+
+      (locked?'<div style="font-size:9px;color:var(--dim)">TIER '+(prod.tierReq+1)+' REQUIRED</div>':
+        '<button class="focus-btn'+(currentProduct===pid?' active':'')+'">'+
+          (currentProduct===pid?'✓ FOCUSED':'FOCUS HERE')+
+        '</button>');
+    if(!locked&&currentProduct!==pid){
+      card.querySelector('.focus-btn').onclick=function(e){e.stopPropagation();setFocus(pid);};
+    }
+    panel.appendChild(card);
+  });
+
+  // Contracts
+  var csec=document.createElement('div');csec.className='psec';csec.textContent='CONTRACTS';panel.appendChild(csec);
+  var pending=contracts.filter(function(c){return !c.done&&!c.expired;});
+  if(!pending.length){
+    var empty=document.createElement('div');
+    empty.style.cssText='font-size:9px;color:var(--dim);padding:8px;text-align:center;';
+    empty.textContent='No contracts. Check back tomorrow.';
+    panel.appendChild(empty);
+  }
+  pending.forEach(function(c){
+    var prod=PRODUCTS[c.product];
+    var card=document.createElement('div');
+    card.className='contract-card'+(c.accepted?' accepted':'');
+    var pct=c.accepted?Math.min(100,(c.progress/c.qty)*100):0;
+    var daysLeft=c.deadline-gameDay;
+    card.innerHTML=
+      '<div class="cc-title">'+(c.accepted?'📋 ':'📄 ')+prod.icon+' '+prod.name+' Contract</div>'+
+      '<div class="cc-details">'+
+        'Deliver: <b>'+fmtUnits(c.qty)+'</b> units &nbsp;|&nbsp; '+
+        'By Day: <b>'+c.deadline+'</b> ('+daysLeft+'d left)<br>'+
+        'Reward: <b style="color:#6dbf6d">'+fmt(c.reward)+'</b> &nbsp;'+
+        (c.accepted?'| Penalty: <b style="color:#e53935">'+fmt(c.penalty)+'</b>':'')+
+      '</div>'+
+      (c.accepted?'<div class="cc-progress"><div class="cc-prog-fill" style="width:'+pct+'%"></div></div><div style="font-size:8px;color:var(--dim);margin-bottom:5px">'+fmtUnits(c.progress)+' / '+fmtUnits(c.qty)+' ('+Math.floor(pct)+'%)</div>':'')+
+      (c.accepted?
+        '<div style="font-size:9px;color:#6dbf6d;text-align:center">IN PROGRESS</div>' :
+        '<div class="cc-btns"><button class="cc-btn accept" data-id="'+c.id+'">ACCEPT</button><button class="cc-btn decline">SKIP</button></div>');
+    if(!c.accepted){
+      var ab=card.querySelector('.cc-btn.accept');
+      if(ab) ab.onclick=function(){acceptContract(Number(this.dataset.id));};
+      var db=card.querySelector('.cc-btn.decline');
+      if(db) db.onclick=function(){
+        var idx=contracts.findIndex(function(cc){return cc.id===c.id;});
+        if(idx>-1) contracts.splice(idx,1);
+        renderMarketPanel();
+      };
+    }
+    panel.appendChild(card);
+  });
+}
+
+function renderStaffPanel(){
+  var panel=document.getElementById('panel-staff');
+  panel.innerHTML='';
+
+  // Current headcount + daily salary
+  var dailyCost=getDailyExpense();
+  var totWorkers=workers.length;
+  var hcEl=document.createElement('div');
+  hcEl.style.cssText='background:#1c1c1c;border:1px solid #333;border-radius:3px;padding:8px 11px;margin-bottom:2px;';
+  hcEl.innerHTML='<div style="display:flex;justify-content:space-between"><div><div style="font-size:12px;font-weight:700">'+totWorkers+' Employees</div><div style="font-size:9px;color:var(--dim)">Total headcount</div></div><div style="text-align:right"><div style="font-size:12px;font-weight:700;color:#e53935">-'+fmt(dailyCost)+'/day</div><div style="font-size:9px;color:var(--dim)">Daily payroll</div></div></div>';
+  panel.appendChild(hcEl);
+
+  var sec=document.createElement('div');sec.className='psec';sec.textContent='HIRE / FIRE';panel.appendChild(sec);
+  WORKER_TYPES.forEach(function(wt){
+    var count=workers.filter(function(w){return w.type===wt.id;}).length;
+    var upfront=Math.floor(wt.salary*DAY_DURATION*3);
+    var card=document.createElement('div');
+    card.className='staff-card';
+    card.innerHTML=
+      '<div class="sc2-row">'+
+        '<span class="sc2-icon">'+wt.icon+'</span>'+
+        '<div class="sc2-info">'+
+          '<div class="sc2-name">'+wt.name+'</div>'+
+          '<div class="sc2-effect">'+wt.effect+'</div>'+
+          '<div class="sc2-salary">'+fmt(wt.salary)+'/s salary · '+fmt(upfront)+' upfront</div>'+
+        '</div>'+
+        '<div class="sc2-controls">'+
+          '<button class="sc2-btn fire-btn" data-type="'+wt.id+'">−</button>'+
+          '<span class="sc2-count">'+count+'</span>'+
+          '<button class="sc2-btn hire-btn" data-type="'+wt.id+'">+</button>'+
+        '</div>'+
+      '</div>';
+    card.querySelector('.hire-btn').onclick=function(){hireWorker(this.dataset.type);};
+    card.querySelector('.fire-btn').onclick=function(){fireWorker(this.dataset.type);};
+    panel.appendChild(card);
+  });
+
+  // R&D Section
+  var rsec=document.createElement('div');rsec.className='psec';rsec.textContent='R&D PROJECTS';panel.appendChild(rsec);
+  var rdItems=[
+    {id:'rd_speed',name:'Production Optimization',cost:8000,effect:'All machine speed +40%',done:!!rdProjects.rd_speed},
+    {id:'rd_quality',name:'Advanced Quality Control',cost:12000,effect:'All unit value +80%',done:!!rdProjects.rd_quality},
+    {id:'rd_auto',name:'Automation Protocol',cost:25000,effect:'Unlock tier 3 machines early',done:!!rdProjects.rd_auto},
+    {id:'rd_market',name:'Market Intelligence AI',cost:15000,effect:'Product prices +25% permanently',done:!!rdProjects.rd_market},
+  ];
+  rdItems.forEach(function(r){
+    var card=document.createElement('div');
+    card.className='shop-card'+(r.done?' bought':'');
+    card.style.opacity=r.done?'.55':'1';
+    card.innerHTML=
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
+        '<span style="font-size:14px">🔬</span>'+
+        '<span style="font-size:11px;font-weight:700">'+r.name+(r.done?' ✓':'')+'</span>'+
+      '</div>'+
+      '<div style="font-size:9px;color:var(--dim);margin-bottom:5px">'+r.effect+'</div>'+
+      (r.done?
+        '<div style="font-size:9px;color:#6dbf6d">COMPLETED</div>' :
+        '<button style="width:100%;padding:5px;border-radius:3px;font-family:Courier New,monospace;font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;border:1px solid rgba(30,136,229,.4);background:rgba(30,136,229,.15);color:#90caf9;">RESEARCH '+fmt(r.cost)+'</button>');
+    if(!r.done){
+      card.querySelector('button').onclick=function(){investRD(r);};
+    }
+    panel.appendChild(card);
+  });
+}
+
+function investRD(r){
+  if(rdProjects[r.id]){showNotify('ALREADY RESEARCHED');return;}
+  if(money<r.cost){showNotify('NEED '+fmt(r.cost),'#e53935');return;}
+  money-=r.cost;
+  rdProjects[r.id]=true;
+  if(r.id==='rd_speed') speedMult*=1.4;
+  if(r.id==='rd_quality') valueMult*=1.8;
+  if(r.id==='rd_market'){Object.keys(market).forEach(function(k){market[k].price*=1.25;});}
+  showNotify('R&D COMPLETE: '+r.name.toUpperCase(),'#90caf9');
+  renderStaffPanel();
+}
+
+function renderFinancePanel(){
+  var panel=document.getElementById('panel-finance');
+  panel.innerHTML='';
+
+  var sec=document.createElement('div');sec.className='psec';sec.textContent='INVESTMENTS';panel.appendChild(sec);
+  INVEST_TYPES.forEach(function(it){
+    var card=document.createElement('div');
+    card.className='invest-card';
+    card.innerHTML=
+      '<div class="ic-header"><span class="ic-icon">'+it.icon+'</span><span class="ic-name">'+it.name+'</span>'+
+        '<span class="ic-return">'+(it.retMin===it.retMax?Math.round((it.retMin-1)*100)+'%':Math.round((it.retMin-1)*100)+'–'+Math.round((it.retMax-1)*100)+'%')+'</span>'+
+      '</div>'+
+      '<div class="ic-desc">'+it.desc+'</div>'+
+      '<input class="ic-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="Amount to invest..." id="inv-amt-'+it.id+'">'+
+      '<button class="ic-btn" data-type="'+it.id+'">INVEST ▶</button>';
+    card.querySelector('.ic-btn').onclick=function(){
+      var amt=parseFloat(document.getElementById('inv-amt-'+it.id).value);
+      invest(it.id,amt);
+    };
+    panel.appendChild(card);
+  });
+
+  if(investments.length){
+    var asec=document.createElement('div');asec.className='psec';asec.textContent='ACTIVE INVESTMENTS';panel.appendChild(asec);
+    investments.forEach(function(inv){
+      var it=INVEST_TYPES.find(function(t){return t.id===inv.type;});
+      var el=document.createElement('div');
+      el.className='active-inv';
+      el.innerHTML='<span class="ai-type">'+it.icon+' '+it.name+'</span>'+
+        '<span class="ai-amount">'+fmt(inv.amount)+'</span>'+
+        '<span class="ai-maturity">Day '+inv.matures+'</span>'+
+        '<span class="ai-ret">→ '+fmt(inv.amount*inv.retMult)+'</span>';
+      panel.appendChild(el);
+    });
+  }
+
+  // Financial overview
+  var osec=document.createElement('div');osec.className='psec';osec.textContent='OVERVIEW';panel.appendChild(osec);
+  [
+    ['Day',gameDay],
+    ['Total Earned',fmt(totalEarned)],
+    ['Cash on Hand',fmt(money)],
+    ['Daily Payroll',fmt(getDailyExpense())],
+    ['Speed Mult','×'+speedMult.toFixed(2)],
+    ['Value Mult','×'+valueMult.toFixed(2)],
+    ['Active Laws',activeLaws.length||'None'],
+  ].forEach(function(row){
+    var el=document.createElement('div');
+    el.className='stat-row';
+    el.innerHTML='<span class="stat-lbl">'+row[0]+'</span><span class="stat-val">'+row[1]+'</span>';
+    panel.appendChild(el);
+  });
+
+  // Active laws
+  if(activeLaws.length){
+    var lsec=document.createElement('div');lsec.className='psec';lsec.textContent='ACTIVE LAWS / EVENTS';panel.appendChild(lsec);
+    activeLaws.forEach(function(l){
+      var el=document.createElement('div');
+      el.style.cssText='background:#1a1a2a;border:1px solid #2a2a4a;border-radius:3px;padding:7px 10px;margin-bottom:4px;';
+      el.innerHTML='<div style="font-size:10px;font-weight:700;color:#b39ddb">'+l.name+'</div><div style="font-size:8px;color:var(--dim)">'+l.desc+' — expires day '+l.expiresDay+'</div>';
+      panel.appendChild(el);
+    });
+  }
+}
+
+function renderUpgradesPanel(){
+  var panel=document.getElementById('panel-upgrades');
+  panel.innerHTML='';
+  var sec=document.createElement('div');sec.className='psec';sec.textContent='FACTORY UPGRADES';panel.appendChild(sec);
+  UPGRADES.forEach(function(u){
+    var locked=u.tierReq>tier;
+    var card=document.createElement('div');
+    card.className='upgrade-card'+(locked?' locked':u.bought?' bought':'');
+    card.innerHTML=
+      '<div class="uc-name">'+u.name+(u.bought?' ✓':'')+'</div>'+
+      '<div class="uc-desc">'+u.desc+'</div>'+
+      '<div style="display:flex;align-items:center">'+
+        '<span class="uc-cost" style="color:'+(u.bought?'#4caf50':money>=u.cost?'#1e88e5':'#e53935')+'">'+
+          (u.bought?'PURCHASED':fmt(u.cost))+
+        '</span>'+
+        (locked?'<span style="margin-left:auto;font-size:8px;color:#666">TIER '+(u.tierReq+1)+'</span>':'')+
+      '</div>';
+    if(!locked&&!u.bought) card.onclick=function(){buyUpgrade(u.id);};
+    panel.appendChild(card);
+  });
+}
+
+// ── GLOBAL EXPANSION DATA ────────────────────────────────────────────────────
+var GLOBAL_LOCATIONS={
+  china:    {name:'China',      flag:'🇨🇳',desc:'Low labor costs — mass production',         bonusDesc:'Production speed +35%',       cost:50000,  tierReq:1, bonus:{rate:1.35},             income:40},
+  germany:  {name:'Germany',    flag:'🇩🇪',desc:'Engineering precision hub',                 bonusDesc:'All product value +25%',      cost:100000, tierReq:1, bonus:{value:1.25},            income:90},
+  india:    {name:'India',      flag:'🇮🇳',desc:'Large skilled tech workforce',              bonusDesc:'Production speed +25%',       cost:70000,  tierReq:1, bonus:{rate:1.25},             income:55},
+  brazil:   {name:'Brazil',     flag:'🇧🇷',desc:'Rich in raw natural resources',            bonusDesc:'Source machine rate +30%',    cost:80000,  tierReq:1, bonus:{rate:1.30},             income:65},
+  singapore:{name:'Singapore',  flag:'🇸🇬',desc:'World-class trade and logistics hub',      bonusDesc:'All market demand +20%',      cost:180000, tierReq:2, bonus:{demand:1.20},           income:160},
+  usa:      {name:'USA',        flag:'🇺🇸',desc:'Premium consumer market',                  bonusDesc:'All product value +40%',      cost:200000, tierReq:2, bonus:{value:1.40},            income:180},
+  japan:    {name:'Japan',      flag:'🇯🇵',desc:'Precision manufacturing excellence',       bonusDesc:'Speed +20% and value +20%',   cost:150000, tierReq:2, bonus:{rate:1.20,value:1.20},  income:140},
+  dubai:    {name:'Dubai',      flag:'🇦🇪',desc:'100% tax-free economic zone',              bonusDesc:'Salary costs −90%',           cost:250000, tierReq:2, bonus:{taxFree:true},           income:250},
+  germany2: {name:'South Korea',flag:'🇰🇷',desc:'Electronics and semiconductor leader',    bonusDesc:'Speed +30% and value +15%',   cost:220000, tierReq:2, bonus:{rate:1.30,value:1.15},  income:200},
+  canada:   {name:'Canada',     flag:'🇨🇦',desc:'Stable market with strong demand',        bonusDesc:'All demand +15% and value +10%',cost:120000,tierReq:1, bonus:{demand:1.15,value:1.10},income:110},
+};
+
+var COMPANIES=[
+  {id:'deepcore', name:'DeepCore Mining',       icon:'⛏️', cost:40000,   income:45,   tierReq:1,
+    desc:'Global mining conglomerate.',            bonusDesc:'All source machines +20% rate', globalBonus:{rate:1.20}},
+  {id:'logistix', name:'GlobalRoute Logistics', icon:'🚢', cost:50000,   income:55,   tierReq:1,
+    desc:'International shipping network.',        bonusDesc:'All product income +12%',       globalBonus:{value:1.12}},
+  {id:'steelco',  name:'SteelCo Industries',    icon:'🏗️', cost:25000,   income:30,   tierReq:1,
+    desc:'Veteran steel & metals distributor.',    bonusDesc:'Steel and vehicles value +20%', marketBonus:{steel:1.2,vehicles:1.2}},
+  {id:'circuitex',name:'CircuitEx Labs',         icon:'💡', cost:80000,   income:75,   tierReq:1,
+    desc:'Leading electronics R&D firm.',          bonusDesc:'Electronics value +35%',        marketBonus:{electronics:1.35}},
+  {id:'fashionx', name:'FashionX Group',         icon:'👗', cost:60000,   income:60,   tierReq:1,
+    desc:'Textile and fabric empire.',             bonusDesc:'Medicine and chemicals value +20%', marketBonus:{medicine:1.2,chemicals:1.2}},
+  {id:'automotiv',name:'AutoMotiv Corp',         icon:'🚗', cost:180000,  income:190,  tierReq:2,
+    desc:'World-class vehicle manufacturer.',      bonusDesc:'Vehicles demand +30%',          marketBonus:{vehicles:1.3}},
+  {id:'pharmagen',name:'PharmaGen Co',           icon:'💊', cost:280000,  income:270,  tierReq:2,
+    desc:'Global pharmaceutical giant.',           bonusDesc:'Medicine value +40%',           marketBonus:{medicine:1.40}},
+  {id:'energymax',name:'EnergyMax Corp',         icon:'⚡', cost:320000,  income:310,  tierReq:2,
+    desc:'Industrial energy supplier.',            bonusDesc:'All speed +15% and demand +15%',globalBonus:{rate:1.15}, marketBonus:{chemicals:1.2}},
+  {id:'aerojet',  name:'AeroJet Industries',     icon:'🚀', cost:800000,  income:600,  tierReq:3,
+    desc:'Aerospace and defence leader.',          bonusDesc:'Aerospace value +50%',          marketBonus:{aerospace:1.5}},
+  {id:'meditech', name:'MediTech Systems',       icon:'🏥', cost:600000,  income:480,  tierReq:3,
+    desc:'Medical technology pioneer.',            bonusDesc:'Medicine value ×2 and demand +20%',marketBonus:{medicine:2.0}},
+  {id:'quantdyn', name:'QuantumDyn Research',    icon:'⚛️', cost:2000000, income:1500, tierReq:3,
+    desc:'Cutting-edge quantum research lab.',     bonusDesc:'Quantum tech value ×2',         marketBonus:{quantum:2.0}},
+  {id:'globalbank',name:'Global Sovereign Bank', icon:'🏦', cost:1500000, income:1200, tierReq:3,
+    desc:'International investment bank.',         bonusDesc:'All product income +30%',       globalBonus:{value:1.30}},
+];
+
+// ── GLOBAL BONUS STATE ────────────────────────────────────────────────────────
+var globalFactories=[];   // array of location IDs owned
+var ownedCompanies=[];    // array of company IDs owned
+var globalSpeedBonus=1;
+var globalValueBonus=1;
+var globalDemandBonus=1;
+var globalTaxFree=false;
+
+function effSpeed(){return speedMult*globalSpeedBonus;}
+function effValue(){return valueMult*globalValueBonus;}
+
+function recomputeGlobalBonuses(){
+  globalSpeedBonus=1; globalValueBonus=1; globalDemandBonus=1; globalTaxFree=false;
+  globalFactories.forEach(function(lid){
+    var loc=GLOBAL_LOCATIONS[lid]; if(!loc) return;
+    if(loc.bonus.rate)    globalSpeedBonus *=loc.bonus.rate;
+    if(loc.bonus.value)   globalValueBonus *=loc.bonus.value;
+    if(loc.bonus.demand)  globalDemandBonus*=loc.bonus.demand;
+    if(loc.bonus.taxFree) globalTaxFree=true;
+  });
+  ownedCompanies.forEach(function(cid){
+    var co=COMPANIES.find(function(c){return c.id===cid;}); if(!co) return;
+    if(co.globalBonus){
+      if(co.globalBonus.rate)  globalSpeedBonus *=co.globalBonus.rate;
+      if(co.globalBonus.value) globalValueBonus *=co.globalBonus.value;
+    }
+  });
+}
+
+function getPassiveIncome(){
+  var total=0;
+  globalFactories.forEach(function(lid){
+    var loc=GLOBAL_LOCATIONS[lid]; if(loc) total+=loc.income;
+  });
+  ownedCompanies.forEach(function(cid){
+    var co=COMPANIES.find(function(c){return c.id===cid;}); if(co) total+=co.income;
+  });
+  return total;
+}
+
+function buyLocation(locId){
+  var loc=GLOBAL_LOCATIONS[locId]; if(!loc) return;
+  if(globalFactories.indexOf(locId)>-1){showNotify('ALREADY ESTABLISHED','#888');return;}
+  if(loc.tierReq>tier){showNotify('NEED TIER '+(loc.tierReq+1)+' TO EXPAND HERE','#e53935');return;}
+  if(money<loc.cost){showNotify('NEED '+fmt(loc.cost)+' TO ESTABLISH','#e53935');return;}
+  money-=loc.cost;
+  globalFactories.push(locId);
+  recomputeGlobalBonuses();
+  renderExpandPanel();
+  updateHUDBar(getProductionRate()*getUnitValue(),getDailyExpense()/DAY_DURATION);
+  showNotify('🌍 FACTORY ESTABLISHED IN '+loc.name.toUpperCase(),'#b39ddb');
+}
+
+function acquireCompany(coId){
+  var co=COMPANIES.find(function(c){return c.id===coId;}); if(!co) return;
+  if(ownedCompanies.indexOf(coId)>-1){showNotify('ALREADY OWNED','#888');return;}
+  if(co.tierReq>tier){showNotify('NEED TIER '+(co.tierReq+1)+' FOR ACQUISITION','#e53935');return;}
+  if(money<co.cost){showNotify('NEED '+fmt(co.cost)+' TO ACQUIRE','#e53935');return;}
+  money-=co.cost;
+  ownedCompanies.push(coId);
+  recomputeGlobalBonuses();
+  renderExpandPanel();
+  updateHUDBar(getProductionRate()*getUnitValue(),getDailyExpense()/DAY_DURATION);
+  showNotify('🤝 ACQUIRED: '+co.name.toUpperCase(),'#6dbf6d');
+}
+
+function renderExpandPanel(){
+  var panel=document.getElementById('panel-expand'); if(!panel) return;
+  panel.innerHTML='';
+
+  // Passive income + active bonus summary
+  var passive=getPassiveIncome();
+  var bonusLines='';
+  if(globalSpeedBonus>1) bonusLines+='<div class="exp-bonus-line">⚡ Production speed ×'+globalSpeedBonus.toFixed(2)+'</div>';
+  if(globalValueBonus>1) bonusLines+='<div class="exp-bonus-line">💰 Product value ×'+globalValueBonus.toFixed(2)+'</div>';
+  if(globalDemandBonus>1) bonusLines+='<div class="exp-bonus-line">📈 Market demand ×'+globalDemandBonus.toFixed(2)+'</div>';
+  if(globalTaxFree) bonusLines+='<div class="exp-bonus-line" style="color:#f5a400">★ Tax-free zone — salaries −90%</div>';
+  var sumEl=document.createElement('div');
+  sumEl.className='exp-summary';
+  sumEl.innerHTML=
+    '<div class="exp-summary-row">'+
+      '<span style="font-size:8px;letter-spacing:3px;color:var(--dim)">PASSIVE INCOME</span>'+
+      '<span class="exp-passive-val">'+(passive>0?'+'+fmt(passive)+'/s':'—')+'</span>'+
+    '</div>'+
+    '<div style="font-size:8px;color:var(--dim);margin-top:2px">'+
+      globalFactories.length+' location'+(globalFactories.length!==1?'s':'')+' · '+
+      ownedCompanies.length+' compan'+(ownedCompanies.length!==1?'ies':'y')+
+    '</div>'+
+    bonusLines;
+  panel.appendChild(sumEl);
+
+  // ── GLOBAL FACTORIES ──
+  var gSec=document.createElement('div'); gSec.className='psec'; gSec.textContent='GLOBAL FACTORIES'; panel.appendChild(gSec);
+  var hint=document.createElement('div');
+  hint.style.cssText='font-size:8px;color:var(--dim);padding:2px 4px 6px;line-height:1.4;';
+  hint.textContent='Establish factories around the world for passive income and permanent production bonuses.';
+  panel.appendChild(hint);
+
+  Object.keys(GLOBAL_LOCATIONS).forEach(function(lid){
+    var loc=GLOBAL_LOCATIONS[lid];
+    var owned=globalFactories.indexOf(lid)>-1;
+    var locked=loc.tierReq>tier;
+    var card=document.createElement('div');
+    card.className='gloc-card'+(owned?' owned':locked?' locked':'');
+    card.innerHTML=
+      '<div class="gloc-header">'+
+        '<span class="gloc-flag">'+loc.flag+'</span>'+
+        '<div style="flex:1">'+
+          '<div class="gloc-name">'+loc.name+'</div>'+
+          '<div class="gloc-desc">'+loc.desc+'</div>'+
+        '</div>'+
+        '<div style="text-align:right">'+
+          '<div class="gloc-income">+'+fmt(loc.income)+'/s</div>'+
+          (locked?'<div style="font-size:7px;color:#555;letter-spacing:1px;margin-top:2px">TIER '+(loc.tierReq+1)+'</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="gloc-bonus">'+loc.bonusDesc+'</div>'+
+      (owned?
+        '<button class="gloc-btn owned-btn">✓ ESTABLISHED</button>':
+        '<button class="gloc-btn" data-lid="'+lid+'">'+(locked?'🔒 LOCKED — TIER '+(loc.tierReq+1):fmt(loc.cost)+' — ESTABLISH ▶')+'</button>');
+    if(!owned&&!locked){
+      card.querySelector('.gloc-btn').onclick=function(){buyLocation(this.dataset.lid);};
+    }
+    panel.appendChild(card);
+  });
+
+  // ── ACQUISITIONS ──
+  var aSec=document.createElement('div'); aSec.className='psec'; aSec.textContent='ACQUISITIONS'; panel.appendChild(aSec);
+  var hint2=document.createElement('div');
+  hint2.style.cssText='font-size:8px;color:var(--dim);padding:2px 4px 6px;line-height:1.4;';
+  hint2.textContent='Buy out competitor companies for passive income and permanent market advantages.';
+  panel.appendChild(hint2);
+
+  COMPANIES.forEach(function(co){
+    var owned=ownedCompanies.indexOf(co.id)>-1;
+    var locked=co.tierReq>tier;
+    var card=document.createElement('div');
+    card.className='co-card'+(owned?' owned':locked?' locked':'');
+    card.innerHTML=
+      '<div class="co-header">'+
+        '<span class="co-icon">'+co.icon+'</span>'+
+        '<div style="flex:1">'+
+          '<div class="co-name">'+co.name+'</div>'+
+          '<div class="co-desc">'+co.desc+'</div>'+
+        '</div>'+
+        '<div style="text-align:right">'+
+          '<div class="co-income">+'+fmt(co.income)+'/s</div>'+
+          (locked?'<div style="font-size:7px;color:#555;letter-spacing:1px;margin-top:2px">TIER '+(co.tierReq+1)+'</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="co-bonus">'+co.bonusDesc+'</div>'+
+      (owned?
+        '<button class="co-btn owned-btn">✓ ACQUIRED</button>':
+        '<button class="co-btn" data-cid="'+co.id+'">'+(locked?'🔒 LOCKED — TIER '+(co.tierReq+1):fmt(co.cost)+' — ACQUIRE ▶')+'</button>');
+    if(!owned&&!locked){
+      card.querySelector('.co-btn').onclick=function(){acquireCompany(this.dataset.cid);};
+    }
+    panel.appendChild(card);
+  });
+}
+
+// ── INPUT ────────────────────────────────────────────────────────────────────
+canvas.addEventListener('mousemove',function(e){
+  ghostX=e.offsetX; ghostY=e.offsetY;
+  if(isDragging){camX=dragCX+(e.offsetX-dragSX);camY=dragCY+(e.offsetY-dragSY);}
+  var gp=screenToGrid(e.offsetX,e.offsetY);
+  if(gp&&currentTool==='select'&&!selectedMachine){
+    var m=getMachineAt(gp.col,gp.row);
+    var tip=document.getElementById('tooltip');
+    if(m&&MACHINES[m.id]){
+      var def=MACHINES[m.id];
+      var lines=['<b>'+def.name+'</b>'];
+      if(def.type==='source') lines.push('Rate: '+def.rate+'/s &nbsp; OUT: '+JSON.stringify(m.outBuf));
+      else if(def.type==='repository'){
+        var stockStr=Object.keys(m.inBuf||{}).map(function(t){return m.inBuf[t]+'× '+t.replace(/_/g,' ');}).join(', ')||'empty';
+        lines.push('Stock: '+stockStr);
+        lines.push('Auto-selling by demand...');
+      } else {
+        var inStr=Object.keys(m.inBuf||{}).map(function(t){return m.inBuf[t]+'×'+t.replace(/_/g,' ');}).join(', ')||'empty';
+        var outStr=Object.keys(m.outBuf||{}).map(function(t){return m.outBuf[t]+'×'+t.replace(/_/g,' ');}).join(', ')||'empty';
+        lines.push('IN: '+inStr);
+        lines.push('OUT: '+outStr);
+        if(m.processing) lines.push('Processing… ('+(m.processTimer||0).toFixed(1)+'s left)');
+        else lines.push('Idle');
+      }
+      tip.innerHTML=lines.join('<br>');
+      tip.style.display='block'; tip.style.left=(e.offsetX+12)+'px'; tip.style.top=(e.offsetY-10)+'px';
+    } else {tip.style.display='none';}
+  } else {document.getElementById('tooltip').style.display='none';}
+});
+
+canvas.addEventListener('mousedown',function(e){
+  if(e.button===1||(e.button===2&&currentTool==='select'&&!selectedMachine)){
+    isDragging=true;dragSX=e.offsetX;dragSY=e.offsetY;dragCX=camX;dragCY=camY;return;
+  }
+  if(e.button===2){
+    var gp=screenToGrid(e.offsetX,e.offsetY);if(!gp) return;
+    if(currentTool==='conveyor'){var dirs=['r','d','l','u'];conveyorDir=dirs[(dirs.indexOf(conveyorDir)+1)%4];}
+    else{removeMachine(gp.col,gp.row);}
+    renderBuildPanel();return;
+  }
+  if(e.button===0){
+    var gp2=screenToGrid(e.offsetX,e.offsetY);if(!gp2) return;
+    if(currentTool==='delete'){removeAt(gp2.col,gp2.row);renderBuildPanel();}
+    else if(currentTool==='conveyor'){placeConveyor(gp2.col,gp2.row,conveyorDir);}
+    else if(currentTool==='select'&&selectedMachine){placeMachine(selectedMachine,gp2.col,gp2.row);renderBuildPanel();}
+    else{isDragging=true;dragSX=e.offsetX;dragSY=e.offsetY;dragCX=camX;dragCY=camY;}
+  }
+});
+
+canvas.addEventListener('mouseup',function(){isDragging=false;});
+canvas.addEventListener('mouseleave',function(){ghostX=null;ghostY=null;});
+canvas.addEventListener('contextmenu',function(e){e.preventDefault();});
+canvas.addEventListener('wheel',function(e){
+  e.preventDefault();
+  camX-=e.deltaX*.6; camY-=e.deltaY*.6;
+},{passive:false});
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){selectedMachine=null;setTool('select');}
+  if(e.key==='d'||e.key==='D') setTool('delete');
+  if(e.key==='c'||e.key==='C') setTool('conveyor');
+  if(e.key==='r'||e.key==='R'){var dirs=['r','d','l','u'];conveyorDir=dirs[(dirs.indexOf(conveyorDir)+1)%4];showNotify('CONVEYOR: '+conveyorDir.toUpperCase());}
+});
+
+// ── TOUCH ────────────────────────────────────────────────────────────────────
+(function(){
+  var has=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
+  if(!has) return;
+  var tStart=null,tStartX=0,tStartY=0,tCamX=0,tCamY=0,tMoved=false,longTO=null;
+  var t2SX=0,t2SY=0,t2CX=0,t2CY=0,twoFinger=false;
+  var THRESH=8;
+  canvas.addEventListener('touchstart',function(e){
+    e.preventDefault();
+    if(e.touches.length===2){
+      twoFinger=true;
+      t2SX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      t2SY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      t2CX=camX;t2CY=camY;
+      if(longTO){clearTimeout(longTO);longTO=null;}
+      return;
+    }
+    twoFinger=false;
+    var t=e.touches[0];var rect=canvas.getBoundingClientRect();
+    tStartX=t.clientX-rect.left;tStartY=t.clientY-rect.top;
+    tCamX=camX;tCamY=camY;tMoved=false;
+    longTO=setTimeout(function(){
+      longTO=null;if(tMoved) return;
+      var gp=screenToGrid(tStartX,tStartY);if(!gp) return;
+      if(currentTool==='conveyor'){var dirs=['r','d','l','u'];conveyorDir=dirs[(dirs.indexOf(conveyorDir)+1)%4];showNotify('CONVEYOR: '+conveyorDir.toUpperCase());}
+      else{removeAt(gp.col,gp.row);renderBuildPanel();}
+    },500);
+  },{passive:false});
+  canvas.addEventListener('touchmove',function(e){
+    e.preventDefault();
+    if(twoFinger){
+      if(e.touches.length>=2){var mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;camX=t2CX+(mx-t2SX);camY=t2CY+(my-t2SY);}
+      else twoFinger=false;return;
+    }
+    if(!e.touches.length) return;
+    var t=e.touches[0];var rect=canvas.getBoundingClientRect();
+    var cx=t.clientX-rect.left,cy=t.clientY-rect.top;
+    var dx=cx-tStartX,dy=cy-tStartY;
+    if(!tMoved&&Math.sqrt(dx*dx+dy*dy)>THRESH){tMoved=true;if(longTO){clearTimeout(longTO);longTO=null;}}
+    if(tMoved){camX=tCamX+dx;camY=tCamY+dy;ghostX=selectedMachine?cx:null;ghostY=selectedMachine?cy:null;}
+  },{passive:false});
+  canvas.addEventListener('touchend',function(e){
+    e.preventDefault();twoFinger=false;
+    if(longTO){clearTimeout(longTO);longTO=null;}
+    if(tMoved){ghostX=null;ghostY=null;return;}
+    var t=e.changedTouches[0];var rect=canvas.getBoundingClientRect();
+    var cx=t.clientX-rect.left,cy=t.clientY-rect.top;
+    var gp=screenToGrid(cx,cy);if(!gp) return;
+    if(currentTool==='delete'){removeAt(gp.col,gp.row);renderBuildPanel();}
+    else if(currentTool==='conveyor') placeConveyor(gp.col,gp.row,conveyorDir);
+    else if(currentTool==='select'&&selectedMachine){placeMachine(selectedMachine,gp.col,gp.row);renderBuildPanel();}
+  },{passive:false});
+  canvas.addEventListener('touchcancel',function(){twoFinger=false;if(longTO){clearTimeout(longTO);longTO=null;}ghostX=null;ghostY=null;},{passive:false});
+})();
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('resize',resize);
+resize();
+camX=(canvas.width-COLS*CELL)/2;
+camY=(canvas.height-ROWS*CELL)/2;
+money=800;
+placed={}; conveyors={}; // clear any stale machines from old system
+addContracts();
+renderBuildPanel();
+renderMarketPanel();
+renderGuidePanel();
+renderStaffPanel();
+renderFinancePanel();
+renderUpgradesPanel();
+renderExpandPanel();
+updateHUDBar();
+showNotify('WELCOME TO YOUR FACTORY');
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

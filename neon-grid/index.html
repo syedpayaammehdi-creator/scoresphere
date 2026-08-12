@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Neon Grid — ScoreSphere</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+body{background:#000509;color:#fff;font-family:'Courier New',monospace;overflow:hidden;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;touch-action:none;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:5;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,255,0.015) 2px,rgba(0,255,255,0.015) 3px);}
+
+.screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at center,#001018 0%,#000509 80%);z-index:40;text-align:center;padding:20px;}
+.screen.show{display:flex;}
+.title{font-size:54px;font-weight:900;letter-spacing:14px;color:#00f0ff;
+  text-shadow:0 0 20px #00f0ff,0 0 50px #00a0cc,0 0 90px #005566;margin-bottom:6px;}
+.subtitle{font-size:11px;letter-spacing:6px;color:#ff00e6aa;margin-bottom:30px;text-transform:uppercase;}
+.btn{display:block;width:280px;padding:14px;margin:8px auto;background:rgba(0,240,255,0.06);
+  border:1px solid #00f0ff;color:#00f0ff;font:700 13px/1 'Courier New',monospace;letter-spacing:3px;
+  text-transform:uppercase;cursor:pointer;text-shadow:0 0 8px #00f0ff;
+  box-shadow:0 0 16px rgba(0,240,255,0.2);transition:all .15s;}
+.btn:hover{background:rgba(0,240,255,0.16);box-shadow:0 0 30px rgba(0,240,255,0.5);}
+.btn-pink{border-color:#ff00e6;color:#ff00e6;text-shadow:0 0 8px #ff00e6;background:rgba(255,0,230,0.06);
+  box-shadow:0 0 16px rgba(255,0,230,0.2);}
+.btn-pink:hover{background:rgba(255,0,230,0.16);box-shadow:0 0 30px rgba(255,0,230,0.5);}
+.btn:disabled{opacity:.3;cursor:default;}
+#name-input{width:280px;padding:12px;margin-bottom:14px;background:rgba(255,255,255,0.05);
+  border:1px solid rgba(0,240,255,0.4);color:#fff;font:13px 'Courier New',monospace;letter-spacing:2px;
+  text-align:center;text-transform:uppercase;outline:none;}
+#name-input:focus{border-color:#00f0ff;}
+.hs{font-size:11px;color:#ffcc00aa;letter-spacing:2px;margin-top:18px;}
+.hint{font-size:10px;color:#ffffff55;letter-spacing:1px;margin-top:20px;line-height:1.8;max-width:400px;}
+
+#lobby-list{width:280px;margin:14px 0;text-align:left;}
+.lobby-row{padding:7px 12px;margin:4px 0;background:rgba(0,240,255,0.05);border:1px solid rgba(0,240,255,0.2);
+  font-size:11px;letter-spacing:1px;display:flex;justify-content:space-between;}
+.lobby-row.you{border-color:#ffcc00;color:#ffcc00;}
+.lobby-row.bot{opacity:.55;}
+#lobby-status{font-size:11px;color:#00f0ffaa;letter-spacing:2px;margin:8px 0;}
+
+#game-wrap{display:none;position:relative;}
+#game-wrap.show{display:block;}
+canvas#board{display:block;background:#000309;box-shadow:0 0 40px rgba(0,240,255,0.15);}
+#hud-top{position:absolute;top:-38px;left:0;right:0;display:flex;justify-content:space-between;
+  font-size:11px;letter-spacing:2px;color:#00f0ffcc;padding:0 4px;}
+#alive-list{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.5);border:1px solid rgba(0,240,255,0.25);
+  padding:8px 10px;font-size:10px;letter-spacing:1px;line-height:1.7;min-width:110px;}
+.alive-row{display:flex;align-items:center;gap:6px;}
+.alive-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.alive-row.dead{opacity:.3;text-decoration:line-through;}
+
+#result-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.82);display:none;
+  flex-direction:column;align-items:center;justify-content:center;z-index:10;}
+#result-overlay.show{display:flex;}
+#result-title{font-size:38px;font-weight:900;letter-spacing:6px;margin-bottom:14px;}
+#result-title.win{color:#00ff8c;text-shadow:0 0 30px #00ff8c;}
+#result-title.lose{color:#ff3366;text-shadow:0 0 30px #ff3366;}
+#result-sub{font-size:12px;color:#ffffff88;letter-spacing:2px;margin-bottom:26px;}
+
+#pause-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.75);display:none;
+  flex-direction:column;align-items:center;justify-content:center;z-index:11;}
+#pause-overlay.show{display:flex;}
+
+/* touch controls */
+#touch-ctrl{position:fixed;inset:0;z-index:30;display:none;pointer-events:none;}
+.tc-btn{position:absolute;pointer-events:auto;width:64px;height:64px;border-radius:10px;
+  border:2px solid #00f0ff;color:#00f0ff;background:rgba(0,240,255,0.08);font-size:22px;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(0,240,255,0.3);}
+.tc-btn:active,.tc-btn.active{background:rgba(0,240,255,0.35);box-shadow:0 0 26px rgba(0,240,255,0.7);}
+#tc-up{left:20px;bottom:158px;} #tc-down{left:20px;bottom:20px;}
+#tc-left{left:-48px;bottom:89px; margin-left:68px;} #tc-right{left:88px;bottom:89px;margin-left:68px;}
+#tc-boost{right:24px;bottom:60px;width:84px;height:84px;border-radius:50%;border-color:#ff00e6;
+  color:#ff00e6;background:rgba(255,0,230,0.08);box-shadow:0 0 14px rgba(255,0,230,0.3);font-size:12px;
+  font-weight:700;letter-spacing:1px;}
+#tc-boost:active,#tc-boost.active{background:rgba(255,0,230,0.35);box-shadow:0 0 26px rgba(255,0,230,0.7);}
+#tc-pause{position:fixed;top:14px;right:14px;width:34px;height:34px;border-radius:4px;pointer-events:auto;
+  border:1px solid rgba(0,240,255,0.4);color:#00f0ff;background:rgba(0,0,0,0.4);font-size:14px;z-index:31;}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen show" id="home-screen">
+  <div class="title">NEON GRID</div>
+  <div class="subtitle">Light-Cycle Arena</div>
+  <input id="name-input" maxlength="12" placeholder="CALLSIGN" value="">
+  <button class="btn" id="btn-solo">Solo Survival</button>
+  <button class="btn btn-pink" id="btn-online">Online Battle</button>
+  <div class="hs" id="hs-display"></div>
+  <div class="hint">ARROWS / WASD — turn (90°) &nbsp;·&nbsp; SPACE — boost &nbsp;·&nbsp; ESC — pause<br>Touch: on-screen d-pad + boost button</div>
+</div>
+
+<!-- LOBBY -->
+<div class="screen" id="lobby-screen">
+  <div class="title" style="font-size:34px;">ONLINE BATTLE</div>
+  <div id="lobby-status">CONNECTING…</div>
+  <div id="lobby-list"></div>
+  <button class="btn btn-pink" id="btn-lobby-cancel">Cancel</button>
+</div>
+
+<!-- GAME -->
+<div id="game-wrap">
+  <div id="hud-top"><span id="hud-mode">SOLO</span><span id="hud-round">ROUND 1</span></div>
+  <canvas id="board" width="720" height="720"></canvas>
+  <div id="alive-list"></div>
+  <div id="result-overlay">
+    <div id="result-title">YOU WIN</div>
+    <div id="result-sub"></div>
+    <button class="btn" id="btn-continue">Continue</button>
+    <button class="btn btn-pink" id="btn-result-home">Main Menu</button>
+  </div>
+  <div id="pause-overlay">
+    <div class="title" style="font-size:32px;">PAUSED</div>
+    <button class="btn" id="btn-resume">Resume</button>
+    <button class="btn btn-pink" id="btn-pause-home">Quit</button>
+  </div>
+</div>
+
+<div id="touch-ctrl">
+  <button class="tc-btn" id="tc-up">▲</button>
+  <button class="tc-btn" id="tc-down">▼</button>
+  <button class="tc-btn" id="tc-left">◀</button>
+  <button class="tc-btn" id="tc-right">▶</button>
+  <button class="tc-btn" id="tc-boost">BOOST</button>
+</div>
+<button id="tc-pause">⏸</button>
+
+<script>
+(function(){
+'use strict';
+var hasTouchScreen = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+var GRID = 60, CELL = 12;
+var canvas = document.getElementById('board'), ctx = canvas.getContext('2d');
+function fitCanvas(){
+  var maxPx = Math.min(window.innerWidth, window.innerHeight) * (hasTouchScreen?0.78:0.86);
+  var size = Math.min(720, maxPx);
+  canvas.style.width = size+'px'; canvas.style.height = size+'px';
+}
+window.addEventListener('resize', fitCanvas); fitCanvas();
+
+var COLORS = ['#00f0ff','#ff00e6','#ffe600','#00ff66','#ff8c00','#a020f0'];
+var NAMES  = ['NOVA','KIRA','AXEL','SORA','ZINC','BYTE'];
+
+// ── State ────────────────────────────────────────────────────────────────
+var players = [];      // {slot,x,y,dir,pendDir,color,alive,name,isBot,isRemote,lastX,lastY}
+var grid = [];         // grid[x][y] = slot owner or -1
+var gameMode = 'menu';  // menu|lobby|solo|online
+var running = false, paused = false;
+var round = 1;
+var mySlot = 0;
+var tickAccum = 0, baseInterval = 95; // ms per cell-step
+var boostActive=false, boostTimer=0, boostCooldown=0;
+var ws=null, wsReady=false, roomId=null, joinedOnline=false;
+
+function newGrid(){
+  grid = [];
+  for (var x=0;x<GRID;x++){ grid[x]=[]; for (var y=0;y<GRID;y++) grid[x][y]=-1; }
+}
+
+function loadHS(){ try{ return parseInt(localStorage.getItem('neongrid_hs')||'0',10); }catch(e){ return 0; } }
+function saveHS(v){ try{ localStorage.setItem('neongrid_hs', String(v)); }catch(e){} }
+document.getElementById('hs-display').textContent = 'BEST: ROUND ' + loadHS();
+
+// ── Screens ──────────────────────────────────────────────────────────────
+var homeScreen=document.getElementById('home-screen'), lobbyScreen=document.getElementById('lobby-screen');
+var gameWrap=document.getElementById('game-wrap'), resultOverlay=document.getElementById('result-overlay');
+var pauseOverlay=document.getElementById('pause-overlay');
+function showScreen(id){
+  ['home-screen','lobby-screen'].forEach(function(s){ document.getElementById(s).classList.toggle('show', s===id); });
+  gameWrap.classList.toggle('show', id==='game');
+}
+
+// ── Directions: 0 up(-y) 1 right(+x) 2 down(+y) 3 left(-x) ────────────────
+var DX=[0,1,0,-1], DY=[-1,0,1,0];
+function isOpposite(a,b){ return (a+2)%4===b; }
+
+function spawnLocal(){
+  newGrid();
+  players = [];
+  var name = (document.getElementById('name-input').value||'PILOT').trim().slice(0,12).toUpperCase() || 'PILOT';
+  var p = { slot:0, x:10, y:GRID/2, dir:1, pendDir:1, color:COLORS[0], alive:true, name:name, isBot:false, isRemote:false };
+  players.push(p);
+  grid[p.x][p.y]=0;
+  mySlot = 0;
+  var aiCount = gameMode==='solo' ? Math.min(5, 2+round) : 0;
+  for (var i=0;i<aiCount;i++){
+    var slot=players.length;
+    var edge = slot%4;
+    var sx = edge===3?GRID-8:(edge===1?8:Math.floor(GRID/2));
+    var sy = edge===0?GRID-8:(edge===2?8:Math.floor(GRID/2));
+    var dir = edge===0?2:edge===2?0:edge===1?3:1;
+    var ap = { slot:slot, x:sx, y:sy, dir:dir, pendDir:dir, color:COLORS[slot%COLORS.length], alive:true,
+      name:NAMES[slot%NAMES.length], isBot:true, isRemote:false };
+    players.push(ap);
+    grid[ap.x][ap.y]=slot;
+  }
+}
+
+// ── AI ───────────────────────────────────────────────────────────────────
+function cellSafe(x,y){ return x>=0&&x<GRID&&y>=0&&y<GRID&&grid[x][y]===-1; }
+function aiChooseDir(p){
+  var opts = [p.dir, (p.dir+1)%4, (p.dir+3)%4]; // straight, right, left — prefer straight
+  var safeOpts = opts.filter(function(d){ return cellSafe(p.x+DX[d], p.y+DY[d]); });
+  if (!safeOpts.length) return p.dir; // doomed, keep going (will die)
+  if (Math.random()<0.78 && safeOpts.indexOf(p.dir)>=0) return p.dir;
+  return safeOpts[Math.floor(Math.random()*safeOpts.length)];
+}
+
+// ── Step simulation (local authority for slot 0 + bots) ───────────────────
+function stepGame(){
+  players.forEach(function(p){
+    if (!p.alive || p.isRemote) return;
+    if (p.isBot) p.dir = aiChooseDir(p);
+    else p.dir = p.pendDir;
+    var nx = p.x+DX[p.dir], ny = p.y+DY[p.dir];
+    if (nx<0||nx>=GRID||ny<0||ny>=GRID||grid[nx][ny]!==-1){
+      killPlayer(p);
+      return;
+    }
+    p.x=nx; p.y=ny; grid[nx][ny]=p.slot;
+  });
+  checkRoundEnd();
+}
+
+function killPlayer(p){
+  if (!p.alive) return;
+  p.alive=false;
+  if (p.slot===mySlot && gameMode==='online' && wsReady) send({type:'ko'});
+}
+
+function checkRoundEnd(){
+  if (gameMode==='online') return; // server decides winner for online
+  var alive = players.filter(function(p){ return p.alive; });
+  if (alive.length<=1 && gameMode==='solo'){
+    running=false;
+    if (players[mySlot].alive){
+      if (round>loadHS()) saveHS(round);
+      showResult(true, 'ROUND '+round+' CLEARED — press Continue for round '+(round+1));
+    } else {
+      if (round-1>loadHS()) saveHS(round-1);
+      showResult(false, 'You crashed on round '+round+'. Best: round '+loadHS());
+    }
+  }
+}
+
+// ── Remote (online) handling ────────────────────────────────────────────
+function markRemoteTrail(p, nx, ny){
+  var x0=p.lastX==null?nx:p.lastX, y0=p.lastY==null?ny:p.lastY;
+  var steps = Math.max(Math.abs(nx-x0), Math.abs(ny-y0), 1);
+  for (var i=1;i<=steps;i++){
+    var ix = Math.round(x0 + (nx-x0)*i/steps);
+    var iy = Math.round(y0 + (ny-y0)*i/steps);
+    if (ix>=0&&ix<GRID&&iy>=0&&iy<GRID) grid[ix][iy]=p.slot;
+  }
+  p.x=nx; p.y=ny; p.lastX=nx; p.lastY=ny;
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────
+function draw(){
+  ctx.fillStyle='#000309'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle='rgba(0,240,255,0.05)'; ctx.lineWidth=1;
+  for (var i=0;i<=GRID;i+=4){ ctx.beginPath(); ctx.moveTo(i*CELL,0); ctx.lineTo(i*CELL,GRID*CELL); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*CELL); ctx.lineTo(GRID*CELL,i*CELL); ctx.stroke(); }
+
+  for (var x=0;x<GRID;x++) for (var y=0;y<GRID;y++){
+    var s = grid[x][y];
+    if (s>=0 && players[s]){
+      ctx.fillStyle = players[s].color;
+      ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2);
+    }
+  }
+  players.forEach(function(p){
+    if (!p.alive) return;
+    ctx.save();
+    ctx.shadowColor = p.color; ctx.shadowBlur = 16;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(p.x*CELL, p.y*CELL, CELL, CELL);
+    ctx.restore();
+  });
+}
+
+// ── Main loop ────────────────────────────────────────────────────────────
+var lastT = performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  var dt = now-lastT; lastT=now;
+  if (running && !paused){
+    if (boostTimer>0){ boostTimer-=dt; if (boostTimer<=0) boostActive=false; }
+    if (boostCooldown>0) boostCooldown-=dt;
+    var interval = boostActive ? baseInterval*0.5 : baseInterval;
+    tickAccum += dt;
+    while (tickAccum>=interval){
+      tickAccum -= interval;
+      stepGame();
+    }
+    draw();
+  }
+}
+requestAnimationFrame(loop);
+
+// ── Input ────────────────────────────────────────────────────────────────
+function trySetDir(d){
+  var p = players[mySlot]; if (!p||!p.alive) return;
+  if (isOpposite(d,p.dir)) return;
+  p.pendDir = d;
+}
+window.addEventListener('keydown', function(e){
+  if (e.code==='ArrowUp'||e.code==='KeyW') trySetDir(0);
+  else if (e.code==='ArrowRight'||e.code==='KeyD') trySetDir(1);
+  else if (e.code==='ArrowDown'||e.code==='KeyS') trySetDir(2);
+  else if (e.code==='ArrowLeft'||e.code==='KeyA') trySetDir(3);
+  else if (e.code==='Space'){ e.preventDefault(); tryBoost(); }
+  else if (e.code==='Escape'){ if (running) togglePause(); }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.code)>=0) e.preventDefault();
+});
+function tryBoost(){
+  if (boostCooldown>0 || boostActive || !running || paused) return;
+  boostActive=true; boostTimer=650; boostCooldown=3200;
+}
+
+// touch
+if (hasTouchScreen){
+  document.getElementById('touch-ctrl').style.display='block';
+  document.getElementById('tc-pause').style.display='block';
+  function tapBtn(id, fn){
+    var el=document.getElementById(id);
+    el.addEventListener('touchstart', function(e){ e.preventDefault(); fn(); el.classList.add('active'); }, {passive:false});
+    el.addEventListener('touchend', function(e){ e.preventDefault(); el.classList.remove('active'); }, {passive:false});
+  }
+  tapBtn('tc-up', function(){ trySetDir(0); });
+  tapBtn('tc-down', function(){ trySetDir(2); });
+  tapBtn('tc-left', function(){ trySetDir(3); });
+  tapBtn('tc-right', function(){ trySetDir(1); });
+  tapBtn('tc-boost', tryBoost);
+  document.getElementById('tc-pause').addEventListener('touchstart', function(e){ e.preventDefault(); if (running) togglePause(); });
+
+  // swipe-to-turn anywhere on the canvas too
+  var sx=0, sy=0;
+  canvas.addEventListener('touchstart', function(e){ var t=e.touches[0]; sx=t.clientX; sy=t.clientY; }, {passive:true});
+  canvas.addEventListener('touchend', function(e){
+    var t=e.changedTouches[0]; var dx=t.clientX-sx, dy=t.clientY-sy;
+    if (Math.abs(dx)<24 && Math.abs(dy)<24) return;
+    if (Math.abs(dx)>Math.abs(dy)) trySetDir(dx>0?1:3); else trySetDir(dy>0?2:0);
+  }, {passive:true});
+} else {
+  document.getElementById('tc-pause').style.display='none';
+}
+
+// ── Flow: solo ───────────────────────────────────────────────────────────
+document.getElementById('btn-solo').addEventListener('click', function(){
+  gameMode='solo'; round=1; startRound();
+});
+function startRound(){
+  spawnLocal();
+  running=true; paused=false; tickAccum=0; boostActive=false; boostTimer=0; boostCooldown=0;
+  document.getElementById('hud-mode').textContent='SOLO';
+  document.getElementById('hud-round').textContent='ROUND '+round;
+  resultOverlay.classList.remove('show'); pauseOverlay.classList.remove('show');
+  updateAliveList();
+  showScreen('game');
+}
+function updateAliveList(){
+  var el=document.getElementById('alive-list');
+  if (gameMode==='solo'){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = players.map(function(p){
+    return '<div class="alive-row'+(p.alive?'':' dead')+'"><span class="alive-dot" style="background:'+p.color+'"></span>'+p.name+(p.slot===mySlot?' (you)':'')+'</div>';
+  }).join('');
+}
+function showResult(win, sub){
+  document.getElementById('result-title').textContent = win?'ROUND CLEARED':'ELIMINATED';
+  document.getElementById('result-title').className = win?'win':'lose';
+  document.getElementById('result-sub').textContent = sub;
+  document.getElementById('btn-continue').style.display = (win&&gameMode==='solo') ? 'block':'none';
+  resultOverlay.classList.add('show');
+}
+document.getElementById('btn-continue').addEventListener('click', function(){ round++; startRound(); });
+document.getElementById('btn-result-home').addEventListener('click', goHome);
+document.getElementById('btn-resume').addEventListener('click', togglePause);
+document.getElementById('btn-pause-home').addEventListener('click', goHome);
+function togglePause(){ paused=!paused; pauseOverlay.classList.toggle('show', paused); }
+function goHome(){
+  running=false; paused=false;
+  if (ws){ try{ ws.close(); }catch(e){} ws=null; wsReady=false; }
+  joinedOnline=false;
+  showScreen('home-screen');
+  document.getElementById('hs-display').textContent = 'BEST: ROUND ' + loadHS();
+}
+
+// ── Flow: online ─────────────────────────────────────────────────────────
+var WS_URL = (function(){
+  var h = location.hostname;
+  var isLocal = h==='localhost'||h==='127.0.0.1'||h.indexOf('192.168.')===0||h.slice(-6)==='.local';
+  return (isLocal?'ws://':'wss://')+h+(isLocal?':8080':'')+'/';
+})();
+
+document.getElementById('btn-online').addEventListener('click', function(){
+  gameMode='online'; showScreen('lobby-screen');
+  document.getElementById('lobby-status').textContent='CONNECTING…';
+  document.getElementById('lobby-list').innerHTML='';
+  connectOnline();
+});
+document.getElementById('btn-lobby-cancel').addEventListener('click', function(){
+  if (ws){ try{ws.close();}catch(e){} ws=null; }
+  goHome();
+});
+
+function send(m){ if (ws && wsReady) try{ ws.send(JSON.stringify(m)); }catch(e){} }
+
+function connectOnline(){
+  var name = (document.getElementById('name-input').value||'PILOT').trim().slice(0,12).toUpperCase() || 'PILOT';
+  try { ws = new WebSocket(WS_URL); } catch(e){ onWSError(); return; }
+  ws.onopen = function(){ wsReady=true; send({type:'join', game:'neon', name:name}); };
+  ws.onerror = function(){ onWSError(); };
+  ws.onclose = function(){ if (gameMode==='online' && !running) onWSError(); };
+  ws.onmessage = function(e){
+    var msg; try{ msg=JSON.parse(e.data); }catch(err){ return; }
+    handleOnlineMsg(msg);
+  };
+}
+function onWSError(){
+  document.getElementById('lobby-status').textContent='NO SERVER — FILLING WITH BOTS…';
+  setTimeout(function(){ gameMode='solo'; round=1; startRound(); }, 1000);
+}
+
+function renderLobbyList(list){
+  document.getElementById('lobby-list').innerHTML = list.map(function(p){
+    return '<div class="lobby-row'+(p.slot===mySlot?' you':'')+(p.isBot?' bot':'')+'">'+
+      '<span>'+p.name+(p.slot===mySlot?' (you)':'')+'</span><span>'+(p.isBot?'BOT':'READY')+'</span></div>';
+  }).join('');
+}
+
+function handleOnlineMsg(msg){
+  switch(msg.type){
+    case 'lobby':
+      mySlot = msg.yourSlot; roomId = msg.roomId;
+      players = msg.players.map(function(p){ return remotePlayerFrom(p); });
+      document.getElementById('lobby-status').textContent = 'ROOM '+roomId.toUpperCase()+' — WAITING… ('+players.length+'/6)';
+      renderLobbyList(players);
+      break;
+    case 'joined':
+      if (!players.find(function(p){return p.slot===msg.slot;})) players.push(remotePlayerFrom(msg));
+      document.getElementById('lobby-status').textContent = 'WAITING… ('+players.length+'/6)';
+      renderLobbyList(players);
+      break;
+    case 'start':
+      players = msg.players.map(function(p,i){ return remotePlayerFrom(p, i); });
+      mySlot = msg.yourSlot;
+      beginOnlineMatch();
+      break;
+    case 'pos':
+      var rp = players[msg.slot];
+      if (rp && rp.alive) markRemoteTrail(rp, msg.x, msg.y);
+      break;
+    case 'ko':
+      if (players[msg.slot]) players[msg.slot].alive=false;
+      updateAliveList();
+      break;
+    case 'left':
+      if (players[msg.slot]) players[msg.slot].alive=false;
+      updateAliveList();
+      break;
+    case 'winner':
+      running=false;
+      var won = msg.slot===mySlot;
+      showResult(won, won?'You are the last cycle standing!':'Better luck next match.');
+      break;
+  }
+}
+function remotePlayerFrom(p, idx){
+  var slot = p.slot!=null?p.slot:idx;
+  var startPositions = [
+    {x:6,y:30,dir:1},{x:53,y:30,dir:3},{x:30,y:6,dir:2},{x:30,y:53,dir:0},
+    {x:6,y:6,dir:1},{x:53,y:53,dir:3}
+  ];
+  var sp = startPositions[slot%startPositions.length];
+  return { slot:slot, x:sp.x, y:sp.y, lastX:sp.x, lastY:sp.y, dir:sp.dir, color:COLORS[slot%COLORS.length],
+    alive:true, name:p.name, isBot:!!p.isBot, isRemote: slot!==mySlot };
+}
+function beginOnlineMatch(){
+  newGrid();
+  players.forEach(function(p){ grid[p.x][p.y]=p.slot; p.pendDir=p.dir; });
+  running=true; paused=false; tickAccum=0; boostActive=false; boostTimer=0; boostCooldown=0;
+  document.getElementById('hud-mode').textContent='ONLINE';
+  document.getElementById('hud-round').textContent='ROOM '+(roomId||'').toUpperCase();
+  resultOverlay.classList.remove('show'); pauseOverlay.classList.remove('show');
+  updateAliveList();
+  showScreen('game');
+  startOnlineLocalLoop();
+}
+
+// local player + own movement broadcast for online mode
+var posSendAccum=0;
+function startOnlineLocalLoop(){
+  posSendAccum=0;
+}
+// Hook into stepGame for the local (slot 0-ish) player position broadcast in online mode
+var _origStep = stepGame;
+stepGame = function(){
+  players.forEach(function(p){
+    if (!p.alive || p.isRemote) return;
+    if (p.isBot) p.dir = aiChooseDir(p);
+    else p.dir = p.pendDir;
+    var nx = p.x+DX[p.dir], ny = p.y+DY[p.dir];
+    if (nx<0||nx>=GRID||ny<0||ny>=GRID||grid[nx][ny]!==-1){
+      killPlayer(p);
+      return;
+    }
+    p.x=nx; p.y=ny; grid[nx][ny]=p.slot;
+  });
+  if (gameMode==='online' && running){
+    var me = players[mySlot];
+    posSendAccum += (boostActive?baseInterval*0.5:baseInterval);
+    if (me && me.alive && posSendAccum>=100){
+      posSendAccum=0;
+      send({type:'pos', x:me.x, y:me.y});
+    }
+  }
+  checkRoundEnd();
+  updateAliveList();
+};
+
+})();
+</script>
+</body>
+</html>

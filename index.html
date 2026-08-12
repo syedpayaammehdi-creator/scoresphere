@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScoreSphere</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --gold:#f5b800;
+  --orange:#e84e1b;
+  --dark:#06060e;
+  --card-h:580px;
+}
+
+body{
+  background:var(--dark);
+  color:#fff;
+  font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+  user-select:none;
+}
+
+/* ── Starfield canvas ─── */
+#cvs{position:fixed;inset:0;z-index:0;pointer-events:none;}
+
+/* ── Scanlines overlay ─── */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:998;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);
+}
+
+/* ═══════════════ NAV ═══════════════ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  height:62px;
+  background:rgba(3,3,12,0.88);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;
+}
+.nav-logo{display:flex;align-items:center;gap:14px;}
+.nav-gem{flex-shrink:0;display:flex;}
+.nav-title{
+  font-size:22px;font-weight:900;letter-spacing:6px;
+  text-transform:uppercase;color:var(--gold);
+  line-height:1;
+}
+.nav-right{
+  display:flex;align-items:center;gap:20px;
+}
+.nav-pill{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 14px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:100px;
+  font-size:12px;font-weight:600;letter-spacing:2px;
+  color:rgba(255,255,255,0.5);text-transform:uppercase;
+}
+.nav-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;flex-shrink:0;}
+
+/* ═══════════════ HERO ═══════════════ */
+.hero{
+  position:relative;z-index:10;
+  padding:110px 48px 0;
+  display:flex;flex-direction:column;align-items:center;
+  text-align:center;
+}
+.hero-season{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:5px 18px;margin-bottom:22px;
+  background:rgba(245,184,0,0.1);
+  border:1px solid rgba(245,184,0,0.3);
+  border-radius:100px;
+  font-size:11px;font-weight:800;letter-spacing:5px;color:var(--gold);
+  text-transform:uppercase;
+}
+.hero-title{
+  font-size:clamp(52px,9vw,110px);
+  font-weight:900;letter-spacing:8px;
+  text-transform:uppercase;line-height:0.9;
+  background:linear-gradient(160deg,#fff 0%,#ffe066 45%,var(--orange) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:16px;
+}
+.hero-sub{
+  font-family:'Barlow',sans-serif;
+  font-size:14px;font-weight:400;letter-spacing:2px;
+  color:rgba(255,255,255,0.35);text-transform:uppercase;
+  margin-bottom:52px;
+}
+
+/* ═══════════════ SECTION LABEL ═══════════════ */
+.section-label{
+  position:relative;z-index:10;
+  display:flex;align-items:center;gap:0;
+  max-width:1100px;margin:0 auto 20px;padding:0 40px;
+}
+.sl-bar{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);}
+.sl-text{
+  padding:0 22px;
+  font-size:10px;font-weight:800;letter-spacing:6px;
+  color:rgba(255,255,255,0.3);white-space:nowrap;text-transform:uppercase;
+}
+
+/* ═══════════════ CARDS ═══════════════ */
+.games{
+  position:relative;z-index:10;
+  display:flex;justify-content:center;flex-wrap:wrap;
+  gap:24px;padding:0 40px 80px;
+  max-width:1200px;margin:0 auto;
+}
+
+.card{
+  position:relative;
+  width:420px;height:var(--card-h);
+  border-radius:6px;overflow:hidden;cursor:pointer;
+  border:1.5px solid rgba(255,255,255,0.08);
+  transition:transform 0.3s cubic-bezier(.22,.68,0,1.2),box-shadow 0.3s,border-color 0.3s;
+  flex-shrink:0;
+}
+.card:hover{
+  transform:translateY(-12px) scale(1.025);
+  box-shadow:0 0 0 1.5px var(--gold),0 0 60px rgba(245,184,0,0.2),0 40px 80px rgba(0,0,0,0.85);
+  border-color:var(--gold);
+}
+.card:active{transform:translateY(-4px) scale(1.01);}
+
+/* ── Locked / coming soon card ── */
+.card-locked{opacity:0.28;cursor:default;pointer-events:none;}
+
+/* ── Artwork ── */
+.card-art{position:absolute;inset:0;}
+
+/* ── Stellar Assault art ── */
+.art-sa{
+  background:
+    radial-gradient(ellipse 80% 65% at 50% 20%,rgba(110,40,240,0.55) 0%,transparent 70%),
+    radial-gradient(ellipse 55% 45% at 15% 65%,rgba(0,70,210,0.4) 0%,transparent 65%),
+    radial-gradient(ellipse 45% 40% at 85% 55%,rgba(0,180,255,0.2) 0%,transparent 60%),
+    linear-gradient(170deg,#030014 0%,#060028 45%,#000008 100%);
+}
+.art-sa::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 90% 35% at 50% 22%,rgba(160,80,255,0.16) 0%,transparent 70%),
+    radial-gradient(ellipse 70% 30% at 25% 55%,rgba(0,80,255,0.1) 0%,transparent 70%);
+}
+/* planet */
+.art-sa::after{
+  content:'';position:absolute;
+  width:220px;height:220px;top:7%;left:50%;transform:translateX(-50%);
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,rgba(100,40,200,0.95) 0%,rgba(25,8,70,0.85) 55%,transparent 78%);
+  box-shadow:0 0 70px rgba(110,40,240,0.45),0 0 140px rgba(70,20,180,0.25);
+}
+
+/* ── Stars in card ── */
+.card-stars{position:absolute;inset:0;overflow:hidden;}
+.card-stars span{
+  position:absolute;border-radius:50%;background:#fff;
+  animation:tw var(--d,3s) infinite ease-in-out var(--del,0s);
+}
+@keyframes tw{0%,100%{opacity:var(--lo,.1);}50%{opacity:var(--hi,.9);}}
+
+/* ── Floating ship ── */
+.card-ship{
+  position:absolute;
+  top:36%;left:50%;transform:translate(-50%,-50%);
+  width:100px;height:60px;
+  background:linear-gradient(135deg,#e8e8e8 0%,#909090 40%,#484848 100%);
+  clip-path:polygon(50% 0%,100% 44%,82% 56%,70% 100%,30% 100%,18% 56%,0% 44%);
+  filter:drop-shadow(0 0 22px rgba(0,210,255,0.95)) drop-shadow(0 0 50px rgba(110,50,255,0.7));
+  animation:float 4s ease-in-out infinite;
+}
+.card-ship::after{
+  content:'';position:absolute;
+  bottom:-20px;left:50%;transform:translateX(-50%);
+  width:14px;height:26px;
+  background:linear-gradient(0deg,transparent,rgba(0,210,255,0.9));
+  clip-path:polygon(25% 0%,75% 0%,88% 100%,12% 100%);
+  animation:thr 0.1s infinite alternate;
+}
+@keyframes float{0%,100%{transform:translate(-50%,-50%) translateY(0);}50%{transform:translate(-50%,-50%) translateY(-9px);}}
+@keyframes thr{from{opacity:.65;transform:translateX(-50%) scaleY(.8);}to{opacity:1;transform:translateX(-50%) scaleY(1.15);}}
+
+/* orbit ring */
+.card-orbit{
+  position:absolute;
+  width:130px;height:130px;
+  top:calc(36% - 65px);left:50%;transform:translateX(-50%);
+  border-radius:50%;
+  border:1px solid rgba(0,210,255,0.2);
+}
+.card-orbit::after{
+  content:'';position:absolute;
+  width:9px;height:9px;border-radius:50%;top:-4.5px;left:50%;
+  background:#00d4ff;box-shadow:0 0 14px #00d4ff,0 0 28px rgba(0,212,255,.6);
+  transform-origin:4.5px 69.5px;
+  animation:orb 3.5s linear infinite;
+}
+@keyframes orb{to{transform:rotate(360deg);}}
+
+/* scan line */
+.card-scan::after{
+  content:'';position:absolute;left:0;right:0;height:2px;top:-2px;
+  background:linear-gradient(90deg,transparent,rgba(0,200,255,.45),transparent);
+  animation:scan 5.5s linear infinite;
+}
+@keyframes scan{to{top:calc(100% + 2px);}}
+
+/* ── Card content ── */
+.card-content{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:32px 28px 28px;
+  background:linear-gradient(0deg,rgba(0,0,0,0.97) 0%,rgba(0,0,0,.80) 55%,transparent 100%);
+}
+.card-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 11px;margin-bottom:12px;
+  background:rgba(245,184,0,0.12);
+  border:1px solid rgba(245,184,0,0.35);
+  border-radius:3px;
+  font-size:9px;font-weight:800;letter-spacing:4px;color:var(--gold);
+  text-transform:uppercase;
+}
+.card-title{
+  font-size:44px;font-weight:900;letter-spacing:2px;
+  text-transform:uppercase;line-height:.95;
+  margin-bottom:10px;
+  text-shadow:0 0 40px rgba(140,80,255,.75);
+}
+.card-desc{
+  font-family:'Barlow',sans-serif;
+  font-size:13px;color:rgba(255,255,255,.5);
+  line-height:1.65;margin-bottom:22px;letter-spacing:.2px;
+}
+.card-meta{
+  display:flex;gap:16px;margin-bottom:20px;
+}
+.card-stat{
+  display:flex;flex-direction:column;gap:2px;
+}
+.card-stat-label{font-size:8px;font-weight:800;letter-spacing:3px;color:rgba(255,255,255,.3);text-transform:uppercase;}
+.card-stat-val{font-size:14px;font-weight:800;letter-spacing:1px;color:#fff;}
+
+/* ── Play button ── */
+.play-btn{
+  display:block;width:100%;padding:16px 20px;
+  background:linear-gradient(135deg,#f5b800 0%,#e84e1b 100%);
+  border:none;border-radius:3px;
+  color:#fff;font-size:17px;font-weight:900;
+  letter-spacing:6px;text-transform:uppercase;
+  font-family:'Barlow Condensed',sans-serif;
+  cursor:pointer;
+  clip-path:polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%);
+  transition:filter .18s,transform .15s;
+  position:relative;overflow:hidden;
+}
+.play-btn::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);
+  transform:translateX(-100%);transition:transform .4s;
+}
+.play-btn:hover{filter:brightness(1.2);}
+.play-btn:hover::after{transform:translateX(100%);}
+.play-btn:active{transform:scale(.97);}
+
+/* ── Badge ── */
+.card-badge{
+  position:absolute;top:20px;right:20px;
+  padding:5px 13px;
+  background:linear-gradient(135deg,#7c3aed,#4f00b0);
+  border-radius:3px;
+  font-size:9px;font-weight:900;letter-spacing:3px;color:#fff;
+  text-transform:uppercase;
+  box-shadow:0 0 18px rgba(124,58,237,.6);
+}
+.card-badge-locked{
+  position:absolute;top:20px;right:20px;
+  padding:5px 13px;border-radius:3px;
+  font-size:9px;font-weight:900;letter-spacing:3px;
+  color:rgba(255,255,255,.25);text-transform:uppercase;
+  border:1px solid rgba(255,255,255,.1);
+}
+
+/* ── Golf card art ── */
+.art-golf{
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 80%,rgba(21,128,61,0.7) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 40% at 30% 30%,rgba(14,100,46,0.5) 0%,transparent 65%),
+    linear-gradient(175deg,#87ceeb 0%,#5ba3c9 30%,#1a6b38 55%,#0d4a25 100%);
+}
+.art-golf::before{
+  content:'⛳';position:absolute;
+  font-size:90px;top:30%;left:50%;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 30px rgba(34,197,94,0.8));
+  animation:float 4s ease-in-out infinite;
+}
+.art-golf::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,0.6) 0%,transparent 70%);
+}
+
+/* ── Parkour card art ── */
+.art-pk{
+  background:
+    radial-gradient(ellipse 75% 55% at 50% 35%,rgba(245,164,0,.45) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 45% at 25% 65%,rgba(30,136,229,.3) 0%,transparent 65%),
+    linear-gradient(170deg,#0a0800 0%,#1c1000 45%,#06060e 100%);
+}
+.art-pk::before{
+  content:'🏃';position:absolute;
+  font-size:88px;top:30%;left:50%;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 30px rgba(245,164,0,.9));
+  animation:float 3s ease-in-out infinite;
+}
+.art-pk::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,.7) 0%,transparent 70%);
+}
+
+/* ── Tetris / BLITZ card art ── */
+.art-tetris{
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 70%,rgba(0,229,255,0.25) 0%,transparent 70%),
+    radial-gradient(ellipse 55% 45% at 75% 25%,rgba(160,32,240,0.3) 0%,transparent 65%),
+    linear-gradient(170deg,#020a14 0%,#041828 45%,#06060e 100%);
+}
+.art-tetris::before{
+  content:'🟦';position:absolute;
+  font-size:80px;top:28%;left:50%;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 28px rgba(0,229,255,0.9));
+  animation:float 2.8s ease-in-out infinite;
+}
+.art-tetris::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,.7) 0%,transparent 70%);
+}
+
+/* ── Factory card art ── */
+.art-factory{
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 80%,rgba(120,53,15,0.7) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 40% at 20% 40%,rgba(245,164,0,0.2) 0%,transparent 65%),
+    linear-gradient(175deg,#1a1008 0%,#2a1800 40%,#111 100%);
+}
+.art-factory::before{
+  content:'🏭';position:absolute;
+  font-size:88px;top:30%;left:50%;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 30px rgba(245,164,0,0.9));
+  animation:float 4s ease-in-out infinite;
+}
+.art-factory::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,0.7) 0%,transparent 70%);
+}
+
+/* ── Neon Grid card art ── */
+.art-neon{
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 65%,rgba(0,240,255,0.28) 0%,transparent 70%),
+    radial-gradient(ellipse 55% 45% at 75% 30%,rgba(255,0,230,0.22) 0%,transparent 65%),
+    linear-gradient(170deg,#000508 0%,#001018 45%,#06060e 100%);
+}
+.art-neon::before{
+  content:'▦';position:absolute;color:#00f0ff;
+  font-size:78px;top:30%;left:50%;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 30px rgba(0,240,255,0.9));
+  animation:float 3.2s ease-in-out infinite;
+}
+.art-neon::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,0.7) 0%,transparent 70%);
+}
+
+/* ── The Heist card art ── */
+.art-heist{
+  background:
+    radial-gradient(ellipse 75% 55% at 50% 30%,rgba(245,184,0,0.25) 0%,transparent 70%),
+    radial-gradient(ellipse 55% 45% at 75% 70%,rgba(124,20,160,0.32) 0%,transparent 65%),
+    linear-gradient(170deg,#08050c 0%,#150a1e 45%,#06060e 100%);
+}
+.art-heist::before{
+  content:'🎭';position:absolute;
+  font-size:82px;top:30%;left:50%;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 30px rgba(245,184,0,0.85));
+  animation:float 3.6s ease-in-out infinite;
+}
+.art-heist::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,0.7) 0%,transparent 70%);
+}
+
+/* ── Orbit Rush card art ── */
+.art-orbit{
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 40%,rgba(132,204,22,0.3) 0%,transparent 70%),
+    radial-gradient(ellipse 55% 45% at 75% 65%,rgba(234,179,8,0.25) 0%,transparent 65%),
+    linear-gradient(170deg,#040800 0%,#0a1200 45%,#06060e 100%);
+}
+.art-orbit::before{
+  content:'🔺';position:absolute;color:#a3e635;
+  font-size:76px;top:30%;left:50%;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 30px rgba(132,204,22,0.9));
+  animation:float 2.6s ease-in-out infinite;
+}
+.art-orbit::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,0.7) 0%,transparent 70%);
+}
+
+/* ── Redline card art ── */
+.art-redline{
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 75%,rgba(255,32,32,0.35) 0%,transparent 70%),
+    radial-gradient(ellipse 55% 45% at 75% 30%,rgba(255,140,0,0.22) 0%,transparent 65%),
+    linear-gradient(170deg,#0a0000 0%,#180400 45%,#06060e 100%);
+}
+.art-redline::before{
+  content:'🏎️';position:absolute;
+  font-size:82px;top:30%;left:50%;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 0 30px rgba(255,60,20,0.9));
+  animation:float 2.4s ease-in-out infinite;
+}
+.art-redline::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,0.7) 0%,transparent 70%);
+}
+
+/* ═══════════════ AUTH ═══════════════ */
+.nav-auth-btn{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 18px;
+  background:linear-gradient(135deg,#f5b800,#e84e1b);
+  border:none;border-radius:100px;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:12px;font-weight:800;letter-spacing:2px;color:#06060e;
+  text-transform:uppercase;cursor:pointer;
+  transition:filter .15s,transform .15s;
+}
+.nav-auth-btn:hover{filter:brightness(1.15);}
+.nav-auth-btn:active{transform:scale(.96);}
+.nav-user-pill{
+  display:flex;align-items:center;gap:10px;
+  padding:5px 8px 5px 14px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:100px;
+  font-size:12px;font-weight:700;letter-spacing:1px;color:#fff;
+}
+.nav-user-pill .u-name{color:var(--gold);}
+.nav-signout-btn{
+  padding:4px 10px;background:rgba(255,255,255,0.08);border:none;border-radius:100px;
+  color:rgba(255,255,255,.55);font-size:10px;font-weight:800;letter-spacing:1.5px;
+  text-transform:uppercase;cursor:pointer;font-family:'Barlow Condensed',sans-serif;
+  transition:background .15s,color .15s;
+}
+.nav-signout-btn:hover{background:rgba(255,80,80,.18);color:#ff8080;}
+
+/* ── Modal overlay ── */
+.modal-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(3,3,12,0.75);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.modal-overlay.show{opacity:1;pointer-events:auto;}
+.modal-box{
+  position:relative;
+  width:360px;max-width:90vw;
+  background:linear-gradient(160deg,#0a0a18,#06060e);
+  border:1px solid rgba(255,255,255,.1);border-radius:8px;
+  padding:32px 30px 28px;
+  box-shadow:0 30px 80px rgba(0,0,0,.7),0 0 0 1px rgba(245,184,0,.08);
+  transform:translateY(12px);transition:transform .25s;
+}
+.modal-overlay.show .modal-box{transform:translateY(0);}
+.modal-tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid rgba(255,255,255,.08);}
+.modal-tab{
+  flex:1;padding:0 0 12px;text-align:center;cursor:pointer;
+  font-size:12px;font-weight:800;letter-spacing:3px;text-transform:uppercase;
+  color:rgba(255,255,255,.3);border-bottom:2px solid transparent;
+  transition:color .15s,border-color .15s;
+}
+.modal-tab.active{color:var(--gold);border-color:var(--gold);}
+.modal-field{margin-bottom:16px;}
+.modal-field label{display:block;font-size:10px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:7px;}
+.modal-field input{
+  width:100%;padding:11px 14px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.12);border-radius:4px;color:#fff;
+  font-family:'Barlow',sans-serif;font-size:14px;outline:none;
+  transition:border-color .15s;
+}
+.modal-field input:focus{border-color:var(--gold);}
+.modal-err{
+  font-size:11px;color:#ff6b6b;margin:-6px 0 14px;min-height:14px;letter-spacing:.3px;
+}
+.modal-submit{
+  width:100%;padding:13px;border:none;border-radius:4px;
+  background:linear-gradient(135deg,#f5b800,#e84e1b);
+  color:#06060e;font-family:'Barlow Condensed',sans-serif;
+  font-size:14px;font-weight:900;letter-spacing:3px;text-transform:uppercase;
+  cursor:pointer;transition:filter .15s;
+}
+.modal-submit:hover{filter:brightness(1.12);}
+.modal-close{
+  position:absolute;top:14px;right:16px;
+  background:none;border:none;color:rgba(255,255,255,.35);
+  font-size:22px;cursor:pointer;line-height:1;
+}
+.modal-close:hover{color:#fff;}
+
+/* ═══════════════ CHAT / FORUM ═══════════════ */
+#chat-toggle{
+  position:fixed;right:26px;bottom:26px;z-index:300;
+  width:58px;height:58px;border-radius:50%;
+  background:linear-gradient(135deg,#f5b800,#e84e1b);
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;
+  box-shadow:0 8px 30px rgba(245,184,0,.35),0 0 0 1px rgba(255,255,255,.1);
+  transition:transform .2s;
+}
+#chat-toggle:hover{transform:scale(1.08);}
+#chat-unread{
+  position:absolute;top:-2px;right:-2px;
+  background:#ff3355;color:#fff;border-radius:50%;
+  min-width:20px;height:20px;padding:0 4px;
+  font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  border:2px solid #06060e;display:none;
+}
+#chat-panel{
+  position:fixed;right:26px;bottom:96px;z-index:299;
+  width:340px;max-width:88vw;height:440px;max-height:70vh;
+  background:rgba(6,6,14,0.97);backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,.1);border-radius:10px;
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.7);
+  transform:translateY(16px) scale(.98);opacity:0;pointer-events:none;
+  transition:transform .2s,opacity .2s;
+}
+#chat-panel.show{transform:translateY(0) scale(1);opacity:1;pointer-events:auto;}
+#chat-head{
+  padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08);
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:12px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:var(--gold);
+}
+#chat-head .ch-status{display:flex;align-items:center;gap:6px;font-size:9px;color:rgba(255,255,255,.35);letter-spacing:1.5px;text-transform:none;font-weight:700;}
+#chat-head .ch-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;flex-shrink:0;}
+#chat-head .ch-dot.off{background:#666;box-shadow:none;}
+#chat-msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+#chat-msgs::-webkit-scrollbar{width:5px;}
+#chat-msgs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}
+.chat-line{font-family:'Barlow',sans-serif;font-size:13px;line-height:1.4;color:rgba(255,255,255,.85);word-break:break-word;}
+.chat-line .cl-user{font-weight:700;color:var(--gold);margin-right:6px;}
+.chat-line.sys{color:rgba(255,255,255,.35);font-style:italic;font-size:11px;}
+#chat-inputwrap{padding:12px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:8px;}
+#chat-input{
+  flex:1;padding:10px 12px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.12);border-radius:20px;color:#fff;
+  font-family:'Barlow',sans-serif;font-size:13px;outline:none;
+}
+#chat-input:focus{border-color:var(--gold);}
+#chat-input:disabled{opacity:.4;}
+#chat-send{
+  width:38px;height:38px;border-radius:50%;border:none;flex-shrink:0;
+  background:linear-gradient(135deg,#f5b800,#e84e1b);color:#06060e;
+  font-size:15px;cursor:pointer;
+}
+#chat-send:disabled{opacity:.4;cursor:default;}
+#chat-loginhint{padding:16px;font-size:12px;color:rgba(255,255,255,.4);font-family:'Barlow',sans-serif;line-height:1.6;text-align:center;}
+#chat-loginhint a{color:var(--gold);cursor:pointer;text-decoration:underline;}
+
+/* ═══════════════ FOOTER ═══════════════ */
+footer{
+  position:relative;z-index:10;
+  text-align:center;padding:0 0 44px;
+  font-family:'Barlow',sans-serif;
+  font-size:11px;letter-spacing:3px;
+  color:rgba(255,255,255,.12);text-transform:uppercase;
+}
+footer span{color:rgba(255,255,255,.25);}
+</style>
+</head>
+<body>
+
+<canvas id="cvs"></canvas>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <svg class="nav-gem" width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="ss-g1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#bfdbfe"/>
+          <stop offset="100%" stop-color="#3b82f6"/>
+        </linearGradient>
+        <linearGradient id="ss-g2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#60a5fa"/>
+          <stop offset="100%" stop-color="#1d4ed8"/>
+        </linearGradient>
+        <filter id="ss-glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="1.8" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <!-- S1: top-left -->
+      <text x="2" y="26" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="900" font-size="26"
+            fill="url(#ss-g1)" filter="url(#ss-glow)" opacity="0.95">S</text>
+      <!-- S2: bottom-right, overlapping S1 -->
+      <text x="17" y="41" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="900" font-size="26"
+            fill="url(#ss-g2)" filter="url(#ss-glow)" opacity="0.95">S</text>
+    </svg>
+    <span class="nav-title">ScoreSphere</span>
+  </div>
+  <div class="nav-right">
+    <div class="nav-pill">
+      <div class="nav-dot"></div>
+      <span>Server Online</span>
+    </div>
+    <div id="nav-auth-area"></div>
+  </div>
+</nav>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="auth-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="SSAuth.closeModal()">&times;</button>
+    <div class="modal-tabs">
+      <div class="modal-tab active" id="tab-signin" onclick="SSAuth.switchTab('signin')">Sign In</div>
+      <div class="modal-tab" id="tab-signup" onclick="SSAuth.switchTab('signup')">Create Account</div>
+    </div>
+    <div class="modal-field">
+      <label>Username</label>
+      <input type="text" id="auth-user" autocomplete="username" maxlength="16" placeholder="Callsign">
+    </div>
+    <div class="modal-field">
+      <label>Password</label>
+      <input type="password" id="auth-pass" autocomplete="current-password" maxlength="64" placeholder="••••••••">
+    </div>
+    <div class="modal-err" id="auth-err"></div>
+    <button class="modal-submit" id="auth-submit" onclick="SSAuth.submit()">Sign In</button>
+  </div>
+</div>
+
+<!-- CHAT / FORUM -->
+<button id="chat-toggle" onclick="SSChat.toggle()">💬<span id="chat-unread"></span></button>
+<div id="chat-panel">
+  <div id="chat-head">
+    <span>ScoreSphere Forum</span>
+    <span class="ch-status"><span class="ch-dot off" id="chat-dot"></span><span id="chat-count">connecting…</span></span>
+  </div>
+  <div id="chat-msgs"></div>
+  <div id="chat-inputwrap">
+    <input id="chat-input" type="text" maxlength="300" placeholder="Sign in to chat…" disabled>
+    <button id="chat-send" onclick="SSChat.sendMsg()" disabled>➤</button>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-season">⚡ &nbsp;Season 1 &nbsp;·&nbsp; Now Live</div>
+  <h1 class="hero-title">Choose<br>Your Game</h1>
+  <p class="hero-sub">Select a title and drop in</p>
+</div>
+
+<!-- SECTION LABEL -->
+<div class="section-label">
+  <div class="sl-bar"></div>
+  <span class="sl-text">Available Now</span>
+  <div class="sl-bar"></div>
+</div>
+
+<!-- CARDS -->
+<div class="games">
+
+  <!-- STELLAR ASSAULT -->
+  <div class="card" onclick="window.location.href='stellar-assault/index.html'">
+    <div class="card-art art-sa">
+      <div class="card-stars" id="sa-stars"></div>
+      <div class="card-orbit"></div>
+      <div class="card-ship"></div>
+      <div class="card-scan"></div>
+    </div>
+    <div class="card-badge">Exotic Tier</div>
+    <div class="card-content">
+      <div class="card-tag">⚡ Space Combat</div>
+      <h2 class="card-title">Stellar<br>Assault</h2>
+      <div class="card-meta">
+        <div class="card-stat">
+          <span class="card-stat-label">Modes</span>
+          <span class="card-stat-val">4</span>
+        </div>
+        <div class="card-stat">
+          <span class="card-stat-label">Campaign</span>
+          <span class="card-stat-val">200 Lvl</span>
+        </div>
+        <div class="card-stat">
+          <span class="card-stat-label">Ships</span>
+          <span class="card-stat-val">40+</span>
+        </div>
+      </div>
+      <p class="card-desc">Exotic ships. Adaptive 5v5 battles. 200-level campaign. The Aegis won't stop — neither will you.</p>
+      <button class="play-btn">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+  <!-- PUTT AWAY -->
+  <div class="card" onclick="window.location.href='putt-away/index.html'">
+    <div class="card-art art-golf"></div>
+    <div class="card-badge" style="background:linear-gradient(135deg,#166534,#14532d);box-shadow:0 0 18px rgba(34,197,94,.5);">9 Holes</div>
+    <div class="card-content">
+      <div class="card-tag" style="background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#4ade80;">⛳ 3D Golf</div>
+      <h2 class="card-title" style="text-shadow:0 0 40px rgba(34,197,94,.6);">Putt<br>Away</h2>
+      <div class="card-meta">
+        <div class="card-stat">
+          <span class="card-stat-label">Clubs</span>
+          <span class="card-stat-val">7</span>
+        </div>
+        <div class="card-stat">
+          <span class="card-stat-label">Holes Pool</span>
+          <span class="card-stat-val">18</span>
+        </div>
+        <div class="card-stat">
+          <span class="card-stat-label">Par</span>
+          <span class="card-stat-val">36</span>
+        </div>
+      </div>
+      <p class="card-desc">3D golf with real physics. 7 clubs, an 18-hole pool, a fresh random 9 every round.</p>
+      <button class="play-btn" style="background:linear-gradient(135deg,#22c55e,#15803d);">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+  <!-- PARKOUR -->
+  <div class="card" onclick="window.location.href='parkour/index.html'">
+    <div class="card-art art-pk"></div>
+    <div class="card-badge" style="background:linear-gradient(135deg,#b45309,#92400e);box-shadow:0 0 18px rgba(245,164,0,.4);">First Person</div>
+    <div class="card-content">
+      <div class="card-tag" style="background:rgba(245,164,0,0.1);border-color:rgba(245,164,0,0.35);color:#f5a400;">🏃 3D Parkour</div>
+      <h2 class="card-title" style="text-shadow:0 0 40px rgba(245,164,0,.6);">Parkour</h2>
+      <div class="card-meta">
+        <div class="card-stat"><span class="card-stat-label">Checkpoints</span><span class="card-stat-val">3</span></div>
+        <div class="card-stat"><span class="card-stat-label">Moving Plat.</span><span class="card-stat-val">4</span></div>
+        <div class="card-stat"><span class="card-stat-label">Timer</span><span class="card-stat-val">Live</span></div>
+      </div>
+      <p class="card-desc">First-person 3D parkour. Sprint, double-jump and ride moving platforms across a floating course. Beat your best time.</p>
+      <button class="play-btn" style="background:linear-gradient(135deg,#f5a400,#b45309);">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+  <!-- FACTORY -->
+  <div class="card" onclick="window.location.href='factory/index.html'">
+    <div class="card-art art-factory"></div>
+    <div class="card-badge" style="background:linear-gradient(135deg,#92400e,#78350f);box-shadow:0 0 18px rgba(245,164,0,.4);">Idle Mgmt</div>
+    <div class="card-content">
+      <div class="card-tag" style="background:rgba(245,164,0,0.1);border-color:rgba(245,164,0,0.35);color:#f5a400;">🏭 Factory</div>
+      <h2 class="card-title" style="text-shadow:0 0 40px rgba(245,164,0,.6);">Factory</h2>
+      <div class="card-meta">
+        <div class="card-stat">
+          <span class="card-stat-label">Machines</span>
+          <span class="card-stat-val">8</span>
+        </div>
+        <div class="card-stat">
+          <span class="card-stat-label">Tiers</span>
+          <span class="card-stat-val">5</span>
+        </div>
+        <div class="card-stat">
+          <span class="card-stat-label">Upgrades</span>
+          <span class="card-stat-val">8</span>
+        </div>
+      </div>
+      <p class="card-desc">Place machines, lay conveyors, earn cash. Upgrade your way from a backyard workshop to a global megaplant.</p>
+      <button class="play-btn" style="background:linear-gradient(135deg,#f5a400,#e84e1b);">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+  <div class="card" onclick="window.location.href='tetris/index.html'">
+    <div class="card-art art-tetris"></div>
+    <div class="card-badge" style="background:linear-gradient(135deg,#064a5c,#042030);box-shadow:0 0 18px rgba(0,229,255,.5);">Hyper</div>
+    <div class="card-content">
+      <div class="card-tag" style="background:rgba(0,229,255,0.1);border-color:rgba(0,229,255,0.35);color:#00e5ff;">🟦 BLITZ</div>
+      <h2 class="card-title" style="text-shadow:0 0 40px rgba(0,229,255,.7);">Blitz</h2>
+      <div class="card-meta">
+        <div class="card-stat">
+          <span class="card-stat-label">Speed</span>
+          <span class="card-stat-val">MAX</span>
+        </div>
+        <div class="card-stat">
+          <span class="card-stat-label">Combos</span>
+          <span class="card-stat-val">8×</span>
+        </div>
+        <div class="card-stat">
+          <span class="card-stat-label">Stakes</span>
+          <span class="card-stat-val">HIGH</span>
+        </div>
+      </div>
+      <button class="play-btn" style="background:linear-gradient(135deg,#00e5ff,#a020f0);">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+  <!-- NEON GRID -->
+  <div class="card" onclick="window.location.href='neon-grid/index.html'">
+    <div class="card-art art-neon"></div>
+    <div class="card-badge" style="background:linear-gradient(135deg,#00e5ff,#a020f0);box-shadow:0 0 18px rgba(0,229,255,.5);">6-Player</div>
+    <div class="card-content">
+      <div class="card-tag" style="background:rgba(0,229,255,0.1);border-color:rgba(0,229,255,0.35);color:#00e5ff;">▦ Light-Cycle Arena</div>
+      <h2 class="card-title" style="text-shadow:0 0 40px rgba(0,229,255,.7);">Neon<br>Grid</h2>
+      <div class="card-meta">
+        <div class="card-stat"><span class="card-stat-label">Players</span><span class="card-stat-val">6</span></div>
+        <div class="card-stat"><span class="card-stat-label">Grid</span><span class="card-stat-val">60×60</span></div>
+        <div class="card-stat"><span class="card-stat-label">Mode</span><span class="card-stat-val">Online</span></div>
+      </div>
+      <p class="card-desc">Tron-style light-cycle battle. Leave a trail, cut off your rivals, don't cross your own line. Online 6-player arena or solo vs AI.</p>
+      <button class="play-btn" style="background:linear-gradient(135deg,#00e5ff,#a020f0);">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+  <!-- THE HEIST -->
+  <div class="card" onclick="window.location.href='heist/index.html'">
+    <div class="card-art art-heist"></div>
+    <div class="card-content">
+      <div class="card-tag" style="background:rgba(245,184,0,0.1);border-color:rgba(245,184,0,0.35);color:var(--gold);">🎭 Heist Comedy</div>
+      <h2 class="card-title" style="text-shadow:0 0 40px rgba(124,58,237,.6);">The<br>Heist</h2>
+      <div class="card-meta">
+        <div class="card-stat"><span class="card-stat-label">Missions</span><span class="card-stat-val">8</span></div>
+        <div class="card-stat"><span class="card-stat-label">Endings</span><span class="card-stat-val">50+</span></div>
+        <div class="card-stat"><span class="card-stat-label">Choices</span><span class="card-stat-val">Branching</span></div>
+      </div>
+      <p class="card-desc">A branching stick-figure heist comedy. Every choice leads somewhere new — pull off the perfect job, or fail spectacularly. 50+ endings to find.</p>
+      <button class="play-btn" style="background:linear-gradient(135deg,#7c3aed,#4c1d95);">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+  <!-- ORBIT RUSH -->
+  <div class="card" onclick="window.location.href='orbit-rush/index.html'">
+    <div class="card-art art-orbit"></div>
+    <div class="card-badge" style="background:linear-gradient(135deg,#84cc16,#a16207);box-shadow:0 0 18px rgba(132,204,22,.5);">Vector Arcade</div>
+    <div class="card-content">
+      <div class="card-tag" style="background:rgba(132,204,22,0.1);border-color:rgba(132,204,22,0.35);color:#a3e635;">🔺 Twin-Stick</div>
+      <h2 class="card-title" style="text-shadow:0 0 40px rgba(132,204,22,.6);">Orbit<br>Rush</h2>
+      <div class="card-meta">
+        <div class="card-stat"><span class="card-stat-label">Enemies</span><span class="card-stat-val">4 Types</span></div>
+        <div class="card-stat"><span class="card-stat-label">Waves</span><span class="card-stat-val">∞</span></div>
+        <div class="card-stat"><span class="card-stat-label">Arena</span><span class="card-stat-val">Wrap</span></div>
+      </div>
+      <p class="card-desc">Retro vector arena shooter. Screen-wrapping chaos, splitting enemies, and boss waves every fifth round. Classic arcade, twin-stick controls.</p>
+      <button class="play-btn" style="background:linear-gradient(135deg,#84cc16,#a16207);">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+  <!-- REDLINE -->
+  <div class="card" onclick="window.location.href='redline/index.html'">
+    <div class="card-art art-redline"></div>
+    <div class="card-badge" style="background:linear-gradient(135deg,#dc2626,#7c2d12);box-shadow:0 0 18px rgba(220,38,38,.5);">Open World</div>
+    <div class="card-content">
+      <div class="card-tag" style="background:rgba(255,60,20,0.1);border-color:rgba(255,60,20,0.35);color:#ff6a3d;">🏎️ Racing</div>
+      <h2 class="card-title" style="text-shadow:0 0 40px rgba(255,60,20,.7);">Redline</h2>
+      <div class="card-meta">
+        <div class="card-stat"><span class="card-stat-label">World</span><span class="card-stat-val">Open</span></div>
+        <div class="card-stat"><span class="card-stat-label">Modes</span><span class="card-stat-val">3</span></div>
+        <div class="card-stat"><span class="card-stat-label">Physics</span><span class="card-stat-val">Crash</span></div>
+      </div>
+      <p class="card-desc">Open-world street racing with real impact physics. Free roam, circuit races, or outrun the cops — every crash spins, crumples, and costs you.</p>
+      <button class="play-btn" style="background:linear-gradient(135deg,#dc2626,#7c2d12);">▶ &nbsp;Play Now</button>
+    </div>
+  </div>
+
+</div>
+
+<footer>ScoreSphere &nbsp;<span>·</span>&nbsp; All titles running locally &nbsp;<span>·</span>&nbsp; Season 1</footer>
+
+<script>
+/* ── Starfield ── */
+(function(){
+  var c=document.getElementById('cvs'),ctx=c.getContext('2d');
+  var W,H,stars=[];
+  function resize(){W=c.width=innerWidth;H=c.height=innerHeight;}
+  addEventListener('resize',resize);resize();
+  for(var i=0;i<260;i++) stars.push({
+    x:Math.random()*W,y:Math.random()*H,
+    r:Math.random()<.08?1.6+Math.random()*.8:.3+Math.random()*.9,
+    ph:Math.random()*Math.PI*2,
+    sp:.004+Math.random()*.02,
+    col:Math.random()<.12?'#b8d4ff':Math.random()<.08?'#ffe8a0':'#fff'
+  });
+  var t=0;
+  (function loop(){
+    ctx.clearRect(0,0,W,H);
+    // Atmosphere glow
+    var g=ctx.createRadialGradient(W/2,H*.28,0,W/2,H*.28,W*.65);
+    g.addColorStop(0,'rgba(50,15,100,.4)');g.addColorStop(.6,'rgba(8,4,28,.2)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    t+=.008;
+    for(var i=0;i<stars.length;i++){
+      var s=stars[i];
+      var a=.15+.78*((Math.sin(t*s.sp*50+s.ph)+1)/2);
+      ctx.globalAlpha=a;ctx.fillStyle=s.col;
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    requestAnimationFrame(loop);
+  })();
+})();
+
+/* ── Card star layer ── */
+(function(){
+  var el=document.getElementById('sa-stars');
+  for(var i=0;i<90;i++){
+    var s=document.createElement('span');
+    var sz=Math.random()<.08?1.8+Math.random():.4+Math.random()*.7;
+    s.style.cssText='width:'+sz+'px;height:'+sz+'px;left:'+Math.random()*100+'%;top:'+Math.random()*100+'%;'
+      +'--d:'+(2+Math.random()*5).toFixed(1)+'s;--del:'+(-Math.random()*5).toFixed(1)+'s;'
+      +'--lo:'+(0.08+Math.random()*.18).toFixed(2)+';--hi:'+(0.55+Math.random()*.45).toFixed(2)+';';
+    el.appendChild(s);
+  }
+})();
+
+/* ── Auth + Forum chat (shared WebSocket connection) ─────────── */
+var SSAuth, SSChat;
+(function(){
+  var WS_URL=(function(){
+    var h=location.hostname;
+    var isLocal=h==='localhost'||h==='127.0.0.1'||h.indexOf('192.168.')===0||h.slice(-6)==='.local';
+    return (isLocal?'ws://':'wss://')+h+(isLocal?':8080':'')+'/';
+  })();
+
+  var ws=null, wsReady=false, wsQueue=[];
+  var currentUser=localStorage.getItem('scoresphere_user')||null;
+  var currentHash=localStorage.getItem('scoresphere_hash')||null;
+  var authMode='signin', chatOpen=false, chatJoined=false, unread=0;
+
+  function fnvHash(s){
+    var h=0x811c9dc5|0;
+    for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193); }
+    return (h>>>0).toString(16);
+  }
+  function send(m){
+    if(wsReady&&ws&&ws.readyState===1) ws.send(JSON.stringify(m));
+    else wsQueue.push(m);
+  }
+  function connect(){
+    if(ws&&(ws.readyState===0||ws.readyState===1)) return;
+    try{ ws=new WebSocket(WS_URL); }catch(e){ setDot(false); setTimeout(connect,5000); return; }
+    ws.onopen=function(){
+      wsReady=true; setDot(true);
+      if(currentUser&&currentHash) send({type:'login_hash',user:currentUser,hash:currentHash});
+      var q=wsQueue; wsQueue=[]; q.forEach(send);
+      if(chatOpen&&!chatJoined) joinChat();
+    };
+    ws.onclose=function(){ wsReady=false; chatJoined=false; setDot(false); setTimeout(connect,4000); };
+    ws.onerror=function(){ setDot(false); };
+    ws.onmessage=function(e){
+      var msg; try{ msg=JSON.parse(e.data); }catch(err){ return; }
+      onMsg(msg);
+    };
+  }
+
+  function setDot(on){
+    var d=document.getElementById('chat-dot'), c=document.getElementById('chat-count');
+    if(!d) return;
+    d.classList.toggle('off',!on);
+    if(!on) c.textContent='reconnecting…';
+  }
+
+  function onMsg(msg){
+    switch(msg.type){
+      case 'auth_ok':
+        currentUser=msg.user; currentHash=document.getElementById('auth-pass')?fnvHash(document.getElementById('auth-pass').value||''):currentHash;
+        if(document.getElementById('auth-pass')&&document.getElementById('auth-pass').value) currentHash=fnvHash(document.getElementById('auth-pass').value);
+        if(currentHash){ localStorage.setItem('scoresphere_user',currentUser); localStorage.setItem('scoresphere_hash',currentHash); }
+        renderAuthUI(); closeModal();
+        if(chatOpen) joinChat();
+        break;
+      case 'auth_err':
+        var wasSilent=!document.getElementById('auth-modal').classList.contains('show');
+        if(wasSilent){ logout(); }
+        else { var eEl=document.getElementById('auth-err'); if(eEl) eEl.textContent=msg.msg||'Something went wrong'; }
+        break;
+      case 'chat_history':
+        var box=document.getElementById('chat-msgs');
+        if(box){ box.innerHTML=''; (msg.messages||[]).forEach(appendLine); box.scrollTop=box.scrollHeight; }
+        break;
+      case 'chat_msg':
+        appendLine(msg);
+        var box2=document.getElementById('chat-msgs');
+        if(box2) box2.scrollTop=box2.scrollHeight;
+        if(!chatOpen){ unread++; updateUnread(); }
+        break;
+      case 'chat_presence':
+        var cc=document.getElementById('chat-count'); if(cc) cc.textContent=msg.count+' online';
+        break;
+    }
+  }
+
+  function appendLine(m){
+    var box=document.getElementById('chat-msgs'); if(!box) return;
+    var div=document.createElement('div');
+    div.className='chat-line';
+    var uSpan=document.createElement('span'); uSpan.className='cl-user'; uSpan.textContent=m.user+':';
+    div.appendChild(uSpan);
+    div.appendChild(document.createTextNode(m.text));
+    box.appendChild(div);
+  }
+  function updateUnread(){
+    var b=document.getElementById('chat-unread');
+    if(!b) return;
+    if(unread>0){ b.textContent=unread>9?'9+':unread; b.style.display='flex'; }
+    else b.style.display='none';
+  }
+
+  function renderAuthUI(){
+    var area=document.getElementById('nav-auth-area'); if(!area) return;
+    if(currentUser){
+      area.innerHTML='';
+      var pill=document.createElement('div'); pill.className='nav-user-pill';
+      var name=document.createElement('span'); name.className='u-name'; name.textContent=currentUser;
+      var out=document.createElement('button'); out.className='nav-signout-btn'; out.textContent='Sign Out';
+      out.onclick=logout;
+      pill.appendChild(document.createTextNode('👤 ')); pill.appendChild(name); pill.appendChild(out);
+      area.appendChild(pill);
+    } else {
+      area.innerHTML='<button class="nav-auth-btn" onclick="SSAuth.openModal()">Sign In</button>';
+    }
+    renderChatGate();
+  }
+  function renderChatGate(){
+    var wrap=document.getElementById('chat-inputwrap'), input=document.getElementById('chat-input'), btn=document.getElementById('chat-send');
+    if(!input) return;
+    if(currentUser){ input.disabled=false; btn.disabled=false; input.placeholder='Message the portal…'; }
+    else { input.disabled=true; btn.disabled=true; input.placeholder='Sign in to chat…'; }
+  }
+  function logout(){
+    currentUser=null; currentHash=null;
+    localStorage.removeItem('scoresphere_user'); localStorage.removeItem('scoresphere_hash');
+    chatJoined=false;
+    renderAuthUI();
+  }
+
+  function openModal(){ document.getElementById('auth-modal').classList.add('show'); document.getElementById('auth-err').textContent=''; document.getElementById('auth-user').focus(); }
+  function closeModal(){ document.getElementById('auth-modal').classList.remove('show'); }
+  function switchTab(mode){
+    authMode=mode;
+    document.getElementById('tab-signin').classList.toggle('active',mode==='signin');
+    document.getElementById('tab-signup').classList.toggle('active',mode==='signup');
+    document.getElementById('auth-submit').textContent=mode==='signin'?'Sign In':'Create Account';
+    document.getElementById('auth-err').textContent='';
+  }
+  function submitAuth(){
+    var user=(document.getElementById('auth-user').value||'').trim();
+    var pass=document.getElementById('auth-pass').value||'';
+    var errEl=document.getElementById('auth-err');
+    if(!user||!pass){ errEl.textContent='Enter a username and password'; return; }
+    connect();
+    var tryOnce=function(){
+      if(!wsReady){ setTimeout(tryOnce,200); return; }
+      send({type:authMode==='signin'?'login':'signup', user:user, pass:pass});
+    };
+    tryOnce();
+  }
+
+  function joinChat(){
+    if(!wsReady) return;
+    send({type:'chat_join', name: currentUser||('Guest'+Math.floor(Math.random()*9999))});
+    chatJoined=true;
+  }
+  function toggleChat(){
+    chatOpen=!chatOpen;
+    document.getElementById('chat-panel').classList.toggle('show',chatOpen);
+    if(chatOpen){
+      unread=0; updateUnread();
+      connect();
+      if(!chatJoined) joinChat();
+    }
+  }
+  function sendChatMsg(){
+    var input=document.getElementById('chat-input');
+    var text=(input.value||'').trim();
+    if(!text||!currentUser) return;
+    send({type:'chat_msg', text:text});
+    input.value='';
+  }
+
+  document.addEventListener('DOMContentLoaded',function(){
+    renderAuthUI();
+    connect();
+    document.getElementById('chat-input').addEventListener('keydown',function(e){
+      if(e.key==='Enter') sendChatMsg();
+    });
+  });
+
+  SSAuth={openModal:openModal, closeModal:closeModal, switchTab:switchTab, submit:submitAuth};
+  SSChat={toggle:toggleChat, sendMsg:sendChatMsg};
+})();
+</script>
+</body>
+</html>

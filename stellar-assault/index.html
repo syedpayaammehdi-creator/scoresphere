@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STELLAR ASSAULT</title>
+  <style>
+    @font-face {
+      font-family: 'Orbitron';
+      font-style: normal;
+      font-weight: 400;
+      src: url('fonts/orbitron-400.ttf') format('truetype');
+    }
+    @font-face {
+      font-family: 'Orbitron';
+      font-style: normal;
+      font-weight: 700;
+      src: url('fonts/orbitron-700.ttf') format('truetype');
+    }
+    @font-face {
+      font-family: 'Orbitron';
+      font-style: normal;
+      font-weight: 900;
+      src: url('fonts/orbitron-900.ttf') format('truetype');
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: 'Orbitron', monospace; cursor: none; }
+    #canvas { position: fixed; top: 0; left: 0; display: block; z-index: 0; }
+
+    /* ── Shared screen base ── */
+    .screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 50;
+    }
+    #home-screen     { background: radial-gradient(ellipse at center, rgba(4,4,28,0.82) 0%, rgba(0,0,0,0.88) 100%); }
+    #go-screen       { background: rgba(0,0,0,0.90);  display: none; }
+    #pause-screen    { background: rgba(0,0,0,0.72);  display: none; backdrop-filter: blur(3px); }
+    #hangar-screen   { background: rgba(0,0,8,0.96);  display: none; flex-direction: column; overflow: hidden; }
+    #campaign-screen { background: radial-gradient(ellipse at center, rgba(4,16,4,0.90) 0%, rgba(0,0,0,0.92) 100%); display: none; }
+    #lvlcomplete-screen {
+      display: none; position: fixed;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(0,20,0,0.92); border: 1px solid #00ff88;
+      box-shadow: 0 0 40px rgba(0,255,136,0.25);
+      padding: 44px 60px; border-radius: 8px;
+      flex-direction: column; align-items: center; gap: 10px;
+      z-index: 60; text-align: center;
+    }
+    #victory-screen  { background: rgba(0,0,0,0.94); display: none; }
+
+    /* ── Title ── */
+    .title {
+      font-size: 80px; font-weight: 900; color: #00eeff;
+      text-shadow: 0 0 30px #00ccff, 0 0 70px #0044cc, 0 0 120px #001166;
+      letter-spacing: 14px; line-height: 0.9; text-align: center; margin-bottom: 8px;
+      animation: glow 3s ease-in-out infinite;
+    }
+    @keyframes glow {
+      0%,100% { text-shadow: 0 0 30px #00ccff, 0 0 70px #0044cc; }
+      50%      { text-shadow: 0 0 60px #00eeff, 0 0 120px #0066ff, 0 0 6px #fff; }
+    }
+    .subtitle { font-size: 12px; color: #ffffff44; letter-spacing: 8px; margin-bottom: 34px; text-transform: uppercase; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: block; padding: 13px 44px; margin: 7px auto;
+      font: 13px/1 'Orbitron', monospace; letter-spacing: 5px; text-transform: uppercase;
+      border: 1px solid #00eeff; color: #00eeff;
+      background: rgba(0,238,255,0.05); text-shadow: 0 0 8px #00eeff;
+      box-shadow: 0 0 20px rgba(0,238,255,0.18), inset 0 0 20px rgba(0,238,255,0.03);
+      cursor: pointer; transition: all .22s; min-width: 260px;
+    }
+    .btn:hover {
+      background: rgba(0,238,255,0.14); box-shadow: 0 0 40px rgba(0,238,255,0.55);
+      transform: scale(1.04); letter-spacing: 7px;
+    }
+    .btn-red    { border-color:#ff4444; color:#ff4444; background:rgba(255,68,68,0.05); text-shadow:0 0 8px #ff4444; box-shadow:0 0 20px rgba(255,68,68,0.18),inset 0 0 20px rgba(255,68,68,0.03); }
+    .btn-red:hover { background:rgba(255,68,68,0.14); box-shadow:0 0 40px rgba(255,68,68,0.55); }
+    .btn-yellow { border-color:#ffcc00; color:#ffcc00; background:rgba(255,204,0,0.05); text-shadow:0 0 8px #ffcc00; box-shadow:0 0 20px rgba(255,204,0,0.18),inset 0 0 20px rgba(255,204,0,0.03); }
+    .btn-yellow:hover { background:rgba(255,204,0,0.14); box-shadow:0 0 40px rgba(255,204,0,0.55); }
+
+    /* ── Off-screen target arrows ── */
+    .tar-arrow {
+      position: fixed; width: 0; height: 0; pointer-events: none; z-index: 35;
+      display: none; transform-origin: 50% 50%;
+      border-left:  9px solid transparent;
+      border-right: 9px solid transparent;
+      border-bottom: 20px solid currentColor;
+      filter: drop-shadow(0 0 5px currentColor);
+    }
+    .tar-arrow.tar-enemy { color: #ff3333; }
+    .tar-arrow.tar-ally  { color: #00ff88; }
+    .btn-gold { border-color:#ffd700; color:#ffd700; background:rgba(255,215,0,0.05); text-shadow:0 0 8px #ffd700; box-shadow:0 0 20px rgba(255,215,0,0.18),inset 0 0 20px rgba(255,215,0,0.03); }
+    .btn-gold:hover { background:rgba(255,215,0,0.14); box-shadow:0 0 40px rgba(255,215,0,0.55); }
+    .btn-orange { border-color:#ff6600; color:#ff6600; background:rgba(255,102,0,0.05); text-shadow:0 0 8px #ff6600; box-shadow:0 0 20px rgba(255,102,0,0.18),inset 0 0 20px rgba(255,102,0,0.03); }
+    .btn-orange:hover { background:rgba(255,102,0,0.14); box-shadow:0 0 40px rgba(255,102,0,0.55); }
+    .btn-green { border-color:#00ff88; color:#00ff88; background:rgba(0,255,136,0.05); text-shadow:0 0 8px #00ff88; box-shadow:0 0 20px rgba(0,255,136,0.18),inset 0 0 20px rgba(0,255,136,0.03); }
+    .btn-green:hover { background:rgba(0,255,136,0.14); box-shadow:0 0 40px rgba(0,255,136,0.55); }
+    .btn-cyan { border-color:#00ddff; color:#00ddff; background:rgba(0,221,255,0.05); text-shadow:0 0 8px #00ddff; box-shadow:0 0 20px rgba(0,221,255,0.18),inset 0 0 20px rgba(0,221,255,0.03); }
+    .btn-cyan:hover { background:rgba(0,221,255,0.14); box-shadow:0 0 40px rgba(0,221,255,0.55); }
+
+    /* ── Login / Account screen ── */
+    #login-screen { background: radial-gradient(ellipse at center,rgba(0,4,20,0.97) 0%,rgba(0,0,0,0.99) 100%); flex-direction:column; }
+    #login-card { display:flex; flex-direction:column; gap:14px; width:320px; background:rgba(0,10,40,0.65); border:1px solid rgba(0,150,255,0.22); border-radius:12px; padding:30px 34px; box-shadow:0 0 60px rgba(0,100,255,0.1); }
+    .login-tabs { display:flex; gap:0; border:1px solid rgba(0,150,255,0.22); border-radius:6px; overflow:hidden; margin-bottom:4px; }
+    .login-tab  { flex:1; padding:9px 0; font:10px/1 'Orbitron',monospace; letter-spacing:3px; background:transparent; border:none; cursor:pointer; transition:all .18s; color:#ffffff33; }
+    .login-tab.active { background:rgba(0,150,255,0.18); color:#00ddff; text-shadow:0 0 10px #00aaff; }
+    .login-tab:hover:not(.active) { background:rgba(0,150,255,0.07); color:#ffffff88; }
+    .login-input { width:100%; padding:11px 14px; background:rgba(0,20,60,0.7); border:1px solid rgba(0,150,255,0.2); border-radius:6px; color:#cceeff; font:12px/1 'Orbitron',monospace; letter-spacing:2px; outline:none; transition:border-color .18s; }
+    .login-input::placeholder { color:#ffffff22; }
+    .login-input:focus { border-color:rgba(0,200,255,0.55); box-shadow:0 0 12px rgba(0,150,255,0.2); }
+    #login-err { min-height:16px; text-align:center; font-size:10px; letter-spacing:2px; color:#ff5555; text-shadow:0 0 8px #ff2222; }
+    #login-success { min-height:16px; text-align:center; font-size:10px; letter-spacing:2px; color:#00ff88; text-shadow:0 0 8px #00cc66; }
+    /* Home screen user badge */
+    #home-user-bar { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
+    #home-user-name { font-size:10px; color:#ffffff44; letter-spacing:4px; }
+    #signout-btn { font:9px/1 'Orbitron',monospace; letter-spacing:3px; color:#ff444466; background:transparent; border:1px solid rgba(255,68,68,0.2); border-radius:4px; padding:5px 10px; cursor:pointer; transition:all .18s; }
+    #signout-btn:hover { color:#ff4444; border-color:rgba(255,68,68,0.6); background:rgba(255,68,68,0.08); }
+    #portal-back-btn { font:9px/1 'Orbitron',monospace; letter-spacing:3px; color:rgba(245,184,0,0.55); background:transparent; border:1px solid rgba(245,184,0,0.22); border-radius:4px; padding:5px 10px; cursor:pointer; transition:all .18s; margin-right:auto; }
+    #portal-back-btn:hover { color:#f5b800; border-color:rgba(245,184,0,0.7); background:rgba(245,184,0,0.08); }
+    #home-skill-rating { font:8px/1 'Orbitron',monospace; letter-spacing:3px; color:rgba(255,200,0,0.55); margin-top:6px; }
+
+    /* ── Training Hub ── */
+    #training-screen { background: radial-gradient(ellipse at center, rgba(0,8,22,0.97) 0%, rgba(0,0,0,0.99) 100%); display:none; flex-direction:column; overflow:hidden; }
+    .training-header { display:flex; align-items:center; justify-content:space-between; padding:18px 32px 10px; flex-shrink:0; }
+    .training-title  { font-size:32px; color:#00ddff; letter-spacing:10px; text-shadow:0 0 24px #00aaff; }
+    .training-prog   { font-size:13px; color:#ffffff55; letter-spacing:3px; }
+    .training-body   { flex:1; overflow-y:auto; padding:0 24px 24px; }
+    .training-chapter-label { font-size:10px; color:#ffffff33; letter-spacing:5px; margin:20px 0 8px; text-transform:uppercase; }
+    .training-grid   { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:8px; }
+    .course-card {
+      background:rgba(0,20,40,0.7); border:1px solid rgba(0,180,255,0.2);
+      border-radius:6px; padding:14px 10px 12px; text-align:center;
+      cursor:pointer; transition:all .18s; position:relative;
+    }
+    .course-card:hover:not(.locked) { border-color:#00ddff; background:rgba(0,40,80,0.8); transform:scale(1.03); box-shadow:0 0 18px rgba(0,200,255,0.3); }
+    .course-card.locked  { opacity:0.35; cursor:default; filter:grayscale(0.6); }
+    .course-card.done    { border-color:rgba(0,255,136,0.5); }
+    .course-icon   { font-size:22px; margin-bottom:5px; }
+    .course-name   { font-size:9px; color:#aaddff; letter-spacing:2px; margin-bottom:6px; }
+    .course-stars  { font-size:11px; color:#ffd700; letter-spacing:1px; }
+    .course-num    { position:absolute; top:5px; left:7px; font-size:8px; color:#ffffff22; }
+
+    /* ── Training Lesson List ── */
+    #training-course-detail {
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:55;
+      background:rgba(0,0,16,0.97); flex-direction:column; align-items:center;
+    }
+    .tcd-header  { padding:28px 0 12px; text-align:center; }
+    .tcd-icon    { font-size:44px; margin-bottom:6px; }
+    .tcd-name    { font-size:24px; color:#00ddff; letter-spacing:8px; text-shadow:0 0 18px #00aaff; }
+    .tcd-desc    { font-size:11px; color:#ffffff44; letter-spacing:3px; margin-top:6px; }
+    .tcd-lessons { flex:1; overflow-y:auto; width:100%; max-width:540px; padding:8px 16px 8px; }
+    .lesson-row  {
+      display:flex; align-items:center; gap:14px;
+      padding:14px 18px; margin-bottom:6px;
+      background:rgba(0,20,40,0.6); border:1px solid rgba(0,180,255,0.15);
+      border-radius:6px; cursor:pointer; transition:all .15s;
+    }
+    .lesson-row:hover:not(.lesson-locked) { border-color:#00ddff; background:rgba(0,40,80,0.7); }
+    .lesson-row.lesson-locked { opacity:0.4; cursor:default; }
+    .lesson-row.lesson-done   { border-color:rgba(0,255,136,0.4); }
+    .lesson-num   { font-size:11px; color:#ffffff44; width:22px; flex-shrink:0; }
+    .lesson-title { flex:1; font-size:11px; color:#aaddff; letter-spacing:2px; }
+    .lesson-star  { font-size:14px; }
+    .tcd-footer   { padding:16px; display:flex; gap:12px; }
+
+    /* ── Training Lesson Intro ── */
+    #training-intro {
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:56;
+      background:radial-gradient(ellipse at center, rgba(0,6,20,0.98) 0%, rgba(0,0,0,0.99) 100%);
+      flex-direction:column; align-items:center; justify-content:center;
+    }
+    .ti-chapter  { font-size:10px; color:#00ddff88; letter-spacing:6px; margin-bottom:14px; }
+    .ti-num      { font-size:11px; color:#ffffff33; letter-spacing:3px; margin-bottom:8px; }
+    .ti-title    { font-size:36px; color:#00ddff; letter-spacing:7px; text-shadow:0 0 28px #0088ff; margin-bottom:28px; text-align:center; max-width:700px; }
+    .ti-box      { border:1px solid rgba(0,180,255,0.3); border-radius:8px; padding:28px 40px; max-width:580px; width:90%; margin-bottom:20px; background:rgba(0,20,50,0.5); }
+    .ti-obj-lbl  { font-size:9px; color:#ffffff33; letter-spacing:5px; margin-bottom:8px; }
+    .ti-obj      { font-size:15px; color:#fff; letter-spacing:2px; line-height:1.7; }
+    .ti-hint-lbl { font-size:9px; color:#ffd70066; letter-spacing:5px; margin:14px 0 6px; }
+    .ti-hint     { font-size:11px; color:#ffd70099; letter-spacing:1px; line-height:1.6; font-style:italic; }
+    .ti-footer   { display:flex; gap:14px; margin-top:8px; }
+
+    /* ── Training pass/fail overlay ── */
+    #training-result {
+      display:none; position:fixed;
+      top:50%; left:50%; transform:translate(-50%,-50%);
+      background:rgba(0,10,30,0.96); border-radius:10px;
+      padding:44px 64px; text-align:center; z-index:70;
+      flex-direction:column; align-items:center; gap:10px;
+      min-width:360px;
+    }
+    #training-result.pass { border:1px solid #00ff88; box-shadow:0 0 40px rgba(0,255,136,0.25); }
+    #training-result.fail { border:1px solid #ff4444; box-shadow:0 0 40px rgba(255,68,68,0.25); }
+    .tr-verdict { font-size:38px; letter-spacing:8px; }
+    .tr-verdict.pass { color:#00ff88; text-shadow:0 0 20px #00ff88; }
+    .tr-verdict.fail { color:#ff4444; text-shadow:0 0 20px #ff4444; }
+    .tr-detail  { font-size:13px; color:#ffffff77; letter-spacing:2px; margin:4px 0 16px; }
+    .tr-btns    { display:flex; gap:10px; margin-top:6px; }
+
+    /* ── Training in-game HUD overlay ── */
+    #training-hud {
+      display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%);
+      background:rgba(0,10,30,0.82); border:1px solid rgba(0,180,255,0.35);
+      border-radius:8px; padding:10px 24px; z-index:40; text-align:center;
+      min-width:280px; pointer-events:none;
+    }
+    #th-label   { font-size:9px; color:#00ddff88; letter-spacing:5px; margin-bottom:3px; }
+    #th-obj     { font-size:13px; color:#fff; letter-spacing:2px; margin-bottom:6px; }
+    #th-bar-bg  { background:rgba(255,255,255,0.1); border-radius:4px; height:5px; overflow:hidden; }
+    #th-bar     { height:5px; border-radius:4px; background:#00ddff; transition:width .2s; box-shadow:0 0 8px #00aaff; }
+
+    /* ── Daily Challenge ── */
+    #challenge-screen { background:radial-gradient(ellipse at center,rgba(12,0,0,0.97) 0%,rgba(0,0,0,0.99) 100%); display:none; flex-direction:column; align-items:center; justify-content:center; }
+    .ch-day-tag { font-size:10px; color:#ff660055; letter-spacing:7px; margin-bottom:5px; }
+    .ch-date    { font-size:11px; color:#ffffff33; letter-spacing:4px; margin-bottom:4px; }
+    .ch-tz      { font-size:9px; color:#ffffff18; letter-spacing:2px; margin-bottom:20px; font-style:italic; }
+    #ch-card    { border:1px solid rgba(255,80,0,0.3); border-radius:10px; padding:30px 40px; max-width:540px; width:88%; background:rgba(22,2,0,0.55); box-shadow:0 0 60px rgba(255,50,0,0.08); margin-bottom:20px; }
+    #ch-title   { font-size:30px; color:#ff6600; letter-spacing:8px; text-shadow:0 0 28px #ff4400; margin-bottom:14px; }
+    #ch-flavor  { font-size:12px; color:#ffaa7788; letter-spacing:0.8px; line-height:1.85; margin-bottom:18px; font-style:italic; }
+    #ch-mods    { display:flex; flex-direction:column; gap:6px; margin-bottom:18px; }
+    .ch-mod     { display:flex; align-items:center; gap:10px; font-size:10px; color:#ff8855; letter-spacing:1.5px; background:rgba(255,80,0,0.06); border:1px solid rgba(255,80,0,0.12); border-radius:4px; padding:6px 12px; }
+    .ch-mod-icon { color:#ff4400; }
+    #ch-goal    { font-size:14px; color:#fff; letter-spacing:3px; border-top:1px solid rgba(255,100,0,0.18); padding-top:14px; }
+    #ch-completed { color:#00ff88; font-size:12px; letter-spacing:3px; text-shadow:0 0 12px #00ff88; margin-bottom:10px; }
+    .ch-btns    { display:flex; gap:14px; }
+
+    #challenge-hud {
+      display:none; position:fixed; top:14px; left:50%; transform:translateX(-50%);
+      background:rgba(20,2,0,0.87); border:1px solid rgba(255,80,0,0.38);
+      border-radius:8px; padding:10px 24px; z-index:40; text-align:center;
+      min-width:300px; pointer-events:none;
+    }
+    #ch-hud-label  { font-size:9px; color:#ff660077; letter-spacing:5px; margin-bottom:3px; }
+    #ch-hud-obj    { font-size:13px; color:#fff; letter-spacing:2px; margin-bottom:4px; }
+    #ch-hud-timer  { font-size:12px; color:#ff9944; letter-spacing:3px; margin-bottom:4px; }
+    #ch-hud-bar-bg { background:rgba(255,255,255,0.1); border-radius:4px; height:5px; overflow:hidden; }
+    #ch-hud-bar    { height:5px; border-radius:4px; background:#ff6600; transition:width .2s; box-shadow:0 0 8px #ff4400; }
+
+    #challenge-result {
+      display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      background:rgba(10,0,0,0.97); border-radius:10px;
+      padding:40px 60px; text-align:center; z-index:70;
+      flex-direction:column; align-items:center; gap:8px; min-width:360px;
+    }
+    #challenge-result.pass { border:1px solid #00ff88; box-shadow:0 0 40px rgba(0,255,136,0.2); }
+    #challenge-result.fail { border:1px solid #ff4444; box-shadow:0 0 40px rgba(255,68,68,0.2); }
+    .chr-verdict { font-size:26px; letter-spacing:6px; }
+    .chr-verdict.pass { color:#00ff88; text-shadow:0 0 20px #00ff88; }
+    .chr-verdict.fail { color:#ff4444; text-shadow:0 0 20px #ff4444; }
+    .chr-reason  { font-size:10px; color:#ffffff44; letter-spacing:3px; }
+    .chr-detail  { font-size:13px; color:#ffffff77; letter-spacing:2px; margin:4px 0 14px; }
+    .chr-btns    { display:flex; gap:10px; margin-top:4px; }
+
+    /* ── Training Theory / Field Manual ── */
+    #training-theory {
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:57;
+      background:radial-gradient(ellipse at center, rgba(0,5,18,0.99) 0%, rgba(0,0,0,1) 100%);
+      flex-direction:column; align-items:stretch;
+    }
+    .tt-header { padding:22px 40px 14px; border-bottom:1px solid rgba(0,180,255,0.12); flex-shrink:0; }
+    .tt-tag    { font-size:9px; color:#00ddff66; letter-spacing:7px; margin-bottom:5px; }
+    .tt-subtitle { font-size:10px; color:#ffffff33; letter-spacing:4px; margin-bottom:6px; }
+    .tt-course-name { font-size:26px; color:#00ddff; letter-spacing:7px; text-shadow:0 0 20px #0088ff; }
+    .tt-scroll { flex:1; overflow-y:auto; }
+    .tt-inner  { max-width:600px; margin:0 auto; padding:22px 28px 28px; }
+    .tt-section { margin-bottom:26px; }
+    .tt-section-title { font-size:9px; color:#ffffff2a; letter-spacing:7px; margin-bottom:12px; padding-bottom:5px; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .tt-concept-body { font-size:12px; color:#b8d8f0; line-height:1.85; letter-spacing:0.4px; }
+    .tt-concept-body p { margin-bottom:10px; }
+    .tt-concept-body b { color:#00ddff; font-weight:normal; }
+    .tt-principles { display:flex; flex-direction:column; gap:9px; }
+    .tt-principle { display:flex; align-items:flex-start; gap:12px; background:rgba(0,20,45,0.5); border:1px solid rgba(0,180,255,0.1); border-radius:5px; padding:10px 14px; }
+    .tt-principle-arrow { color:#00ddff; font-size:12px; flex-shrink:0; margin-top:1px; }
+    .tt-principle-text  { font-size:11px; color:#aaddff; letter-spacing:1px; line-height:1.6; }
+    .tt-demo-wrap { background:rgba(0,10,28,0.85); border:1px solid rgba(0,180,255,0.18); border-radius:8px; padding:18px 18px 14px; display:flex; flex-direction:column; align-items:center; gap:8px; }
+    #tt-demo-canvas { border-radius:4px; max-width:100%; }
+    .tt-demo-caption { font-size:8px; color:#ffffff22; letter-spacing:6px; }
+    #tt-demo-anim-label { font-size:11px; color:#00ff88; letter-spacing:2px; min-height:16px; text-align:center; text-shadow:0 0 10px #00ff88; }
+    .tt-footer { padding:14px 28px 22px; display:flex; gap:12px; flex-shrink:0; max-width:600px; margin:0 auto; width:100%; box-sizing:border-box; }
+
+    .ctrl-list { margin-top: 28px; font-size: 13px; color: #ffffff30; line-height: 2.1; text-align: center; }
+    .ctrl-list span { color: #ffffff77; }
+    #home-hs    { margin-top: 16px; font-size: 14px; color: #ffdd00; letter-spacing: 3px; text-shadow: 0 0 10px #ffdd00; }
+    #home-chips { margin-top:  6px; font-size: 14px; color: #ffd700; letter-spacing: 3px; text-shadow: 0 0 10px #ffd700; }
+
+    /* ── Game over ── */
+    .go-title { font-size:64px; color:#ff3333; letter-spacing:8px; text-shadow:0 0 40px #ff0000; margin-bottom:10px; animation:flicker .9s ease-in-out infinite alternate; }
+    @keyframes flicker { from{opacity:1}to{opacity:.76} }
+    #go-mode  { font-size:13px; color:#ffffff44; letter-spacing:4px; margin-bottom:14px; }
+    .go-score { font-size:28px; color:#fff; margin-bottom:4px; }
+    .go-hs    { font-size:17px; color:#ffdd00; text-shadow:0 0 10px #ffdd00; margin-bottom:4px; }
+    .go-new   { font-size:14px; color:#00ff88; letter-spacing:4px; text-shadow:0 0 12px #00ff88; margin-bottom:26px; animation:glow 1s infinite; }
+    #score-tbl { border-collapse:collapse; margin:4px 0 28px; font-size:13px; }
+    #score-tbl td { padding:3px 22px; }
+    #score-tbl .rk { color:#ffdd0066; }
+    #score-tbl .vl { color:#ffffffcc; text-align:right; }
+
+    /* ── Pause ── */
+    .pause-title { font-size:44px; color:#00eeff; letter-spacing:8px; text-shadow:0 0 28px #00eeff; margin-bottom:36px; }
+
+    /* ── Campaign select screen ── */
+    .campaign-title {
+      font-size: 46px; color: #00ff88; letter-spacing: 10px;
+      text-shadow: 0 0 30px #00ff88, 0 0 70px #00cc66;
+      margin-bottom: 8px; animation: glow-green 3s ease-in-out infinite;
+    }
+    @keyframes glow-green {
+      0%,100% { text-shadow: 0 0 30px #00ff88, 0 0 60px #00cc66; }
+      50%      { text-shadow: 0 0 60px #00ff88, 0 0 100px #00ff66, 0 0 6px #fff; }
+    }
+    .campaign-sub { font-size:12px; color:#ffffff33; letter-spacing:6px; margin-bottom:40px; }
+    #cp-progress  { font-size:16px; color:#00ff88; letter-spacing:4px; margin-bottom:30px; text-shadow:0 0 10px #00ff88; }
+
+    /* ── Level complete overlay ── */
+    .lc-title { font-size:30px; color:#00ff88; letter-spacing:6px; text-shadow:0 0 20px #00ff88; margin-bottom:4px; }
+    .lc-chips { font-size:18px; color:#ffd700; letter-spacing:3px; text-shadow:0 0 8px #ffd700; }
+    .lc-total { font-size:13px; color:#ffffff55; letter-spacing:2px; margin-bottom:16px; }
+
+    /* ── Lore screen ── */
+    #lore-screen {
+      background: radial-gradient(ellipse at center, rgba(2,4,18,0.97) 0%, rgba(0,0,0,0.99) 100%);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .lore-header {
+      flex-shrink: 0;
+      padding: 24px 48px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .lore-lvl-num {
+      font-size: 12px; color: #ffffff44; letter-spacing: 5px;
+    }
+    .lore-chapter {
+      font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+      padding: 4px 12px; border-radius: 2px; border: 1px solid;
+    }
+    .lore-chapter.tier-c    { color:#ff6644; border-color:#ff664433; }
+    .lore-chapter.tier-m    { color:#ffaa44; border-color:#ffaa4433; }
+    .lore-chapter.tier-e    { color:#cc66ff; border-color:#cc66ff33; }
+    .lore-chapter.tier-a    { color:#44aaff; border-color:#44aaff33; }
+    .lore-chapter.tier-boss { color:#ffd700; border-color:#ffd70055; text-shadow:0 0 8px #ffd700; }
+
+    .lore-content {
+      flex: 1; overflow-y: auto;
+      padding: 32px 80px 24px;
+      display: flex; flex-direction: column; gap: 18px;
+      max-width: 860px; width: 100%; margin: 0 auto;
+    }
+    .lore-content::-webkit-scrollbar { width: 3px; }
+    .lore-content::-webkit-scrollbar-track { background: transparent; }
+    .lore-content::-webkit-scrollbar-thumb { background: #ffffff18; border-radius: 2px; }
+
+    #lore-title {
+      font-size: 28px; color: #ffffff; letter-spacing: 6px;
+      text-shadow: 0 0 30px rgba(255,255,255,0.15);
+    }
+    #lore-text {
+      font-size: 15px; color: #ffffffaa; line-height: 1.9;
+      font-family: 'Orbitron', monospace;
+    }
+    .lore-divider {
+      height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    }
+    #lore-quote {
+      font-size: 16px; color: #ffffff88; font-style: italic;
+      line-height: 1.7; padding-left: 20px;
+      border-left: 2px solid rgba(255,255,255,0.15);
+    }
+    #lore-speaker {
+      font-size: 11px; color: #ffffff44; letter-spacing: 3px; margin-top: 4px;
+    }
+
+    .lore-footer {
+      flex-shrink: 0;
+      padding: 18px 48px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      display: flex; gap: 16px; justify-content: flex-end;
+    }
+    .lore-footer .btn { margin: 0; min-width: 160px; }
+
+    /* ── Victory screen ── */
+    .victory-title {
+      font-size: 60px; color: #ffd700; letter-spacing: 8px;
+      text-shadow: 0 0 40px #ffd700, 0 0 80px #ff8800;
+      margin-bottom: 12px; animation: glow-gold 1.5s ease-in-out infinite;
+    }
+    @keyframes glow-gold {
+      0%,100% { text-shadow: 0 0 40px #ffd700, 0 0 80px #ff8800; }
+      50%      { text-shadow: 0 0 80px #ffd700, 0 0 140px #ffcc00, 0 0 10px #fff; }
+    }
+    .victory-sub  { font-size:13px; color:#ffffff55; letter-spacing:6px; margin-bottom:20px; }
+    .victory-desc { font-size:16px; color:#ffffffaa; letter-spacing:2px; margin-bottom:8px; text-align:center; max-width:500px; line-height:1.8; }
+    #victory-chips { font-size:16px; color:#ffd700; letter-spacing:3px; text-shadow:0 0 8px #ffd700; margin-bottom:28px; }
+
+    /* ── HUD ── */
+    #hud { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:20; display:none; }
+    #hud-score   { position:absolute; top:18px; right:28px; color:#00eeff; font-size:20px; text-shadow:0 0 10px #00eeff; letter-spacing:2px; }
+    #hud-chips   { position:absolute; top:52px; right:28px; color:#ffd700; font-size:14px; text-shadow:0 0 8px #ffd700; letter-spacing:2px; }
+    #hud-wave    { position:absolute; top:18px; left:50%; transform:translateX(-50%); color:#ffffff55; font-size:13px; letter-spacing:4px; }
+    #hud-enemies { position:absolute; top:18px; left:28px; color:#ff8800; font-size:13px; text-shadow:0 0 8px #ff8800; line-height:1.9; letter-spacing:1px; }
+    #hud-hp      { position:absolute; bottom:68px; left:28px; width:210px; }
+    #hud-enemy-hp { position:absolute; bottom:112px; left:28px; width:210px; display:none; }
+    #enemy-hp-lbl { font-size:10px; letter-spacing:3px; text-transform:uppercase; margin-bottom:4px; color:#ff4444; text-shadow:0 0 6px #ff4444; }
+    #enemy-hp-fill { background:linear-gradient(90deg,#cc0000,#ff4444); box-shadow:0 0 8px #ff2222; width:100%; transition:width .1s; }
+    #hud-heat    { position:absolute; bottom:68px; right:28px; width:190px; text-align:right; }
+    .bar-lbl  { font-size:10px; letter-spacing:3px; text-transform:uppercase; margin-bottom:4px; }
+    .bar-bg   { height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; }
+    .bar-fill { height:100%; border-radius:4px; transition:width .12s; }
+    #hp-lbl   { color:#00ff88; text-shadow:0 0 6px #00ff88; }
+    #hp-fill  { background:linear-gradient(90deg,#00cc44,#00ff88); box-shadow:0 0 8px #00ff66; width:100%; }
+    #heat-lbl  { color:#ffaa00; text-shadow:0 0 6px #ffaa00; }
+    #heat-fill { background:linear-gradient(90deg,#ffbb00,#ff4400); box-shadow:0 0 8px #ff6600; width:0%; float:right; }
+    #heat-warn { font-size:10px; color:#ff4400; letter-spacing:2px; margin-top:4px; opacity:0; text-shadow:0 0 8px #ff4400; }
+
+    /* ── Boss HP bar ── */
+    #boss-hp-wrap {
+      display: none;
+      position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+      width: 440px; text-align: center;
+    }
+    #boss-hp-txt {
+      font-size: 11px; color: #ff4400; letter-spacing: 5px;
+      text-shadow: 0 0 10px #ff2200; margin-bottom: 5px;
+      animation: flicker .7s ease-in-out infinite alternate;
+    }
+    #boss-hp-bar-bg { height: 14px; background: rgba(255,255,255,0.06); border-radius: 7px; overflow: hidden; border: 1px solid rgba(255,60,0,0.35); }
+    #boss-hp-fill   { height: 100%; border-radius: 7px; transition: width .1s; background: linear-gradient(90deg,#cc2200,#ff4400); box-shadow: 0 0 10px #ff2200; width: 100%; }
+
+    /* ── Enemy health bars (campaign) ── */
+    .ehp-wrap {
+      position: fixed; pointer-events: none; z-index: 30;
+      display: none; transform: translateX(-50%);
+    }
+    .ehp-bg {
+      width: 52px; height: 5px;
+      background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 3px; overflow: hidden;
+    }
+    .ehp-fill {
+      height: 100%; width: 100%; border-radius: 3px;
+      background: #00ff66;
+      transition: width 0.08s, background 0.2s;
+    }
+
+    /* ── Crosshair ── */
+    #crosshair { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:44px; height:44px; pointer-events:none; z-index:25; display:none; overflow:visible; }
+    #heat-arc  { transition:stroke-dashoffset 0.08s linear, stroke 0.15s; }
+    .ch-ring { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:38px; height:38px; border-radius:50%; border:1px solid rgba(0,238,255,0.55); }
+    .ch-dot  { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:3px; height:3px; border-radius:50%; background:#00eeff; box-shadow:0 0 6px #00eeff; }
+    .ch-line { position:absolute; background:rgba(0,238,255,0.55); }
+    .ch-line.t { width:1px; height:7px; top:-11px; left:50%; transform:translateX(-50%); }
+    .ch-line.b { width:1px; height:7px; bottom:-11px; left:50%; transform:translateX(-50%); }
+    .ch-line.l { height:1px; width:7px; left:-11px; top:50%; transform:translateY(-50%); }
+    .ch-line.r { height:1px; width:7px; right:-11px; top:50%; transform:translateY(-50%); }
+
+    /* ── HUD messages ── */
+    #wave-msg { position:absolute; top:37%; left:50%; transform:translate(-50%,-50%); color:#ff8800; font-size:38px; text-shadow:0 0 28px #ff6600,0 0 55px #ff2200; letter-spacing:7px; text-align:center; opacity:0; transition:opacity .4s; }
+    #kill-msg { position:absolute; top:34%; left:50%; transform:translate(-50%,-50%); color:#00ff88; font-size:20px; text-shadow:0 0 14px #00ff88; letter-spacing:3px; opacity:0; transition:opacity .2s; }
+    #dmg-vig  { position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; transition:opacity .08s; background:radial-gradient(ellipse at center,transparent 35%,rgba(255,0,0,0.52) 100%); }
+    #speed-hint { position:absolute; bottom:26px; left:50%; transform:translateX(-50%); color:#ffffff22; font-size:11px; letter-spacing:4px; }
+
+    /* ── Touch controls ── */
+    #touch-controls {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 22; pointer-events: none;
+    }
+    #touch-steer-zone {
+      position: absolute; top: 0; left: 0; width: 62%; height: 100%;
+      pointer-events: auto;
+    }
+    #touch-steer-hint {
+      position: absolute; bottom: 90px; left: 28px;
+      font-size: 10px; color: rgba(255,255,255,0.18); letter-spacing: 4px;
+      pointer-events: none; text-transform: uppercase;
+    }
+    #touch-joystick-base {
+      position: fixed; display: none;
+      width: 90px; height: 90px; border-radius: 50%;
+      border: 1px solid rgba(0,238,255,0.35);
+      background: rgba(0,238,255,0.05);
+      transform: translate(-50%, -50%);
+      pointer-events: none; z-index: 23;
+    }
+    #touch-joystick-knob {
+      position: fixed; display: none;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(0,238,255,0.55);
+      box-shadow: 0 0 14px #00eeff, 0 0 28px rgba(0,238,255,0.3);
+      transform: translate(-50%, -50%);
+      pointer-events: none; z-index: 24;
+    }
+    #touch-fire-btn {
+      position: absolute; bottom: 28px; right: 32px;
+      width: 110px; height: 110px; border-radius: 50%;
+      border: 2px solid rgba(255,68,68,0.75);
+      background: rgba(200,20,20,0.15);
+      color: #ff4444; font: bold 13px/1 'Orbitron', monospace;
+      letter-spacing: 3px; text-transform: uppercase;
+      pointer-events: auto; cursor: pointer;
+      box-shadow: 0 0 24px rgba(255,68,68,0.30), inset 0 0 20px rgba(255,68,68,0.08);
+      transition: background .08s, box-shadow .08s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    #touch-fire-btn.fire-active {
+      background: rgba(255,30,30,0.40);
+      box-shadow: 0 0 40px rgba(255,68,68,0.70), inset 0 0 30px rgba(255,68,68,0.20);
+    }
+    #touch-fire-btn:active { background: rgba(255,30,30,0.40); }
+    #touch-throttle-btn {
+      position: absolute; bottom: 46px; right: 158px;
+      width: 90px; height: 90px; border-radius: 50%;
+      border: 2px solid rgba(0,255,140,0.75);
+      background: rgba(0,180,90,0.12);
+      color: #00ff8c; font: bold 12px/1 'Orbitron', monospace;
+      letter-spacing: 2px; text-transform: uppercase;
+      pointer-events: auto; cursor: pointer;
+      box-shadow: 0 0 24px rgba(0,255,140,0.28), inset 0 0 20px rgba(0,255,140,0.08);
+      transition: background .08s, box-shadow .08s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    #touch-throttle-btn.throttle-active {
+      background: rgba(0,255,140,0.38);
+      box-shadow: 0 0 40px rgba(0,255,140,0.65), inset 0 0 30px rgba(0,255,140,0.20);
+    }
+    #touch-pause-btn {
+      position: absolute; top: 16px; right: 16px;
+      width: 46px; height: 46px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(0,0,0,0.35);
+      color: rgba(255,255,255,0.7); font-size: 18px;
+      pointer-events: auto; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── HUD pulse animations ── */
+    @keyframes hud-pulse {
+      0%,100% { opacity: 1; } 50% { opacity: 0.7; }
+    }
+    @keyframes score-pop {
+      0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); }
+    }
+    #hud-score { animation: hud-pulse 4s ease-in-out infinite; }
+    #hud-chips { animation: hud-pulse 4s ease-in-out infinite 1s; }
+    #boss-hp-txt { animation: flicker 0.6s ease-in-out infinite alternate; }
+
+    /* ── Lock-on indicator ── */
+    #lk-indicator {
+      display: none; position: fixed; pointer-events: none; z-index: 30;
+      transform: translate(-50%, -50%); width: 80px; height: 80px;
+    }
+    .lk-corner {
+      position: absolute; width: 14px; height: 14px;
+      border: 2px solid rgba(255,136,0,0.85);
+    }
+    .lk-tl { top:0;    left:0;  border-right:none; border-bottom:none; }
+    .lk-tr { top:0;    right:0; border-left:none;  border-bottom:none; }
+    .lk-bl { bottom:0; left:0;  border-right:none; border-top:none;    }
+    .lk-br { bottom:0; right:0; border-left:none;  border-top:none;    }
+    #lk-label {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      font: 8px/1 'Orbitron', monospace; letter-spacing: 2px;
+      color: rgba(255,136,0,0.9); text-shadow: 0 0 6px #ff8800; white-space: nowrap;
+    }
+    #lk-indicator.lk-locked .lk-corner { border-color: #00ff88; }
+    #lk-indicator.lk-locked #lk-arc-fill { stroke: #00ff88; }
+    #lk-indicator.lk-locked #lk-label { color: #00ff88; text-shadow: 0 0 8px #00ff88; }
+    @keyframes lk-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+    #lk-indicator.lk-locked { animation: lk-pulse 0.32s ease-in-out infinite; }
+
+    /* ── Missile ammo HUD ── */
+    #missile-hud { position:absolute; bottom:112px; right:28px; width:190px; text-align:right; display:none; }
+    #missile-lbl { font-size:10px; letter-spacing:3px; text-transform:uppercase; margin-bottom:5px; color:#ff8800; text-shadow:0 0 6px #ff8800; }
+    .msl-pip { display:inline-block; width:16px; height:6px; border-radius:2px; margin:0 2px;
+      background:#ff8800; box-shadow:0 0 6px #ff8800; transition:background .15s,box-shadow .15s; }
+    .msl-pip.spent { background:rgba(255,136,0,0.14); box-shadow:none; }
+    #missile-reload { font-size:10px; color:#ff8800; letter-spacing:2px; margin-top:4px; text-shadow:0 0 6px #ff8800; min-height:14px; }
+    @keyframes reload-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    #missile-reload.reloading { animation:reload-pulse 0.7s ease-in-out infinite; }
+
+    /* ── Venom charge HUD ── */
+    #venom-hud { position:absolute; bottom:150px; right:28px; width:190px; text-align:right; display:none; }
+    #venom-lbl { font-size:10px; letter-spacing:3px; text-transform:uppercase; margin-bottom:5px; color:#44ff44; text-shadow:0 0 6px #44ff44; }
+    .ven-pip { display:inline-block; width:16px; height:16px; border-radius:50%; margin:0 3px;
+      background:#22ff55; box-shadow:0 0 8px #22ff55, 0 0 14px rgba(34,255,85,0.4); transition:background .15s,box-shadow .15s; }
+    .ven-pip.spent { background:rgba(34,255,85,0.10); box-shadow:none; }
+    #venom-reload { font-size:10px; color:#44ff44; letter-spacing:2px; margin-top:4px; text-shadow:0 0 6px #44ff44; min-height:14px; }
+    #venom-reload.reloading { animation:reload-pulse 0.9s ease-in-out infinite; }
+
+    /* ── Scanlines ── */
+    #scanlines { position:fixed; top:0; left:0; width:100%; height:100%; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px); pointer-events:none; z-index:90; }
+
+    /* ── Ship Hangar ── */
+    .hangar-header { flex-shrink:0; width:100%; padding:22px 32px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(255,215,0,0.15); }
+    .hangar-title  { font-size:28px; color:#ffd700; letter-spacing:10px; text-shadow:0 0 20px #ffd700; }
+    .hangar-chips-display { font-size:18px; color:#ffd700; letter-spacing:4px; text-shadow:0 0 10px #ffd700; }
+    .hangar-chips-display span { font-size:22px; }
+    #ship-grid { flex:1; overflow-y:auto; padding:20px 28px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px; align-content:start; }
+    #ship-grid::-webkit-scrollbar { width:4px; }
+    #ship-grid::-webkit-scrollbar-track { background:transparent; }
+    #ship-grid::-webkit-scrollbar-thumb { background:#ffd70033; border-radius:2px; }
+    .ship-card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:14px 16px; display:flex; flex-direction:column; gap:6px; transition:transform .15s,box-shadow .15s; }
+    .ship-card:hover { transform:translateY(-2px); }
+    .tier-common    { border-color:rgba(0,200,255,0.30); }
+    .tier-rare      { border-color:rgba(180,0,255,0.40); }
+    .tier-epic      { border-color:rgba(255,100,0,0.45); }
+    .tier-legendary { border-color:rgba(255,215,0,0.60); }
+    .tier-exotic    {
+      border-color: rgba(110,60,255,0.7);
+      background:
+        radial-gradient(ellipse at 18% 28%, rgba(90,40,200,0.32) 0%, transparent 52%),
+        radial-gradient(ellipse at 82% 72%, rgba(40,70,220,0.24) 0%, transparent 48%),
+        radial-gradient(ellipse at 55% 20%, rgba(130,30,255,0.18) 0%, transparent 40%),
+        rgba(4,2,18,0.93);
+      box-shadow: 0 0 28px rgba(100,50,255,0.22), inset 0 0 22px rgba(80,30,220,0.08);
+      animation: exotic-pulse 4s ease-in-out infinite;
+      position: relative;
+    }
+    .tier-exotic::before {
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background-image:
+        radial-gradient(1px 1px at 12% 18%, rgba(200,180,255,0.8) 0%, transparent 100%),
+        radial-gradient(1px 1px at 34% 72%, rgba(180,200,255,0.7) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 67% 14%, rgba(255,255,255,0.9) 0%, transparent 100%),
+        radial-gradient(1px 1px at 82% 55%, rgba(200,180,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 48% 88%, rgba(180,160,255,0.6) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 25% 46%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 30%, rgba(200,220,255,0.8) 0%, transparent 100%),
+        radial-gradient(1px 1px at 60% 60%, rgba(180,160,255,0.5) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 5% 85%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 74% 90%, rgba(160,140,255,0.6) 0%, transparent 100%);
+    }
+    .tier-exotic:hover { box-shadow:0 0 50px rgba(110,60,255,0.45), inset 0 0 28px rgba(90,40,220,0.14)!important; border-color:rgba(150,100,255,0.9)!important; }
+    @keyframes exotic-pulse {
+      0%,100% { box-shadow:0 0 28px rgba(100,50,255,0.22), inset 0 0 22px rgba(80,30,220,0.08); border-color:rgba(110,60,255,0.7); }
+      50%      { box-shadow:0 0 48px rgba(120,70,255,0.38), inset 0 0 30px rgba(100,50,240,0.14); border-color:rgba(150,100,255,0.9); }
+    }
+    .ship-selected  { box-shadow:0 0 18px rgba(0,238,255,0.35); border-color:rgba(0,238,255,0.60)!important; }
+    .ship-name { font-size:13px; font-weight:bold; letter-spacing:3px; }
+    .tier-common    .ship-name { color:#00ccff; }
+    .tier-rare      .ship-name { color:#cc66ff; }
+    .tier-epic      .ship-name { color:#ff7722; }
+    .tier-legendary .ship-name { color:#ffd700; text-shadow:0 0 8px #ffd700; }
+    .tier-exotic    .ship-name { color:#b388ff; text-shadow:0 0 14px #7c4dff, 0 0 28px #512da8, 0 0 2px #fff; letter-spacing:4px; }
+    .tier-exotic    .ship-stat { color:#9e7dff; text-shadow:0 0 6px rgba(130,80,255,0.5); }
+    .tier-exotic    .ship-desc { color:#7986cb; font-style:italic; }
+    .exotic-badge   { font-size:8px; color:#b388ff; letter-spacing:6px; text-shadow:0 0 10px #7c4dff, 0 0 20px #512da8; margin-bottom:5px; }
+    .ship-stat { font-size:10px; color:#ffffff55; letter-spacing:1px; line-height:1.5; }
+    .ship-desc { font-size:11px; color:#ffffff44; font-style:italic; line-height:1.5; flex:1; }
+    .ship-btn { margin-top:6px; padding:7px 10px; font:11px/1 'Orbitron',monospace; letter-spacing:3px; text-transform:uppercase; border-radius:3px; cursor:pointer; transition:all .18s; border:1px solid; width:100%; }
+    .ship-btn-active  { border-color:#00eeff; color:#00eeff; background:rgba(0,238,255,0.10); cursor:default; }
+    .ship-btn-select  { border-color:#00eeff55; color:#00eeff; background:transparent; }
+    .ship-btn-select:hover { background:rgba(0,238,255,0.12); border-color:#00eeff; }
+    .ship-btn-buy     { border-color:#ffd700; color:#ffd700; background:rgba(255,215,0,0.06); }
+    .ship-btn-buy:hover { background:rgba(255,215,0,0.18); box-shadow:0 0 12px rgba(255,215,0,0.3); }
+    .ship-btn-locked  { border-color:#ffffff18; color:#ffffff33; background:transparent; cursor:not-allowed; }
+    .ship-btn-trial   { border-color:#00ff8844; color:#00cc66; background:rgba(0,255,136,0.04); margin-top:3px; }
+    .ship-btn-trial:hover { background:rgba(0,255,136,0.13); border-color:#00ff88; color:#00ff88; }
+    .hangar-footer { flex-shrink:0; padding:16px 32px; border-top:1px solid rgba(255,215,0,0.10); display:flex; justify-content:center; }
+    .hangar-footer .btn { margin:0; min-width:200px; }
+    #ally-hud { position:fixed; left:14px; top:50%; transform:translateY(-50%);
+      display:none; flex-direction:column; gap:10px; z-index:100; }
+    .ally-hud-title { font:9px/1 'Orbitron',monospace; letter-spacing:3px; color:#ffffff44;
+      margin-bottom:2px; text-align:center; }
+    .ally-slot { display:flex; flex-direction:column; gap:3px; }
+    .ally-slot-name { font:10px/1 'Orbitron',monospace; letter-spacing:2px; }
+    .ally-hp-bg { width:88px; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; }
+    .ally-hp-fill { height:100%; border-radius:2px; transition:width 0.12s; }
+    .ally-dead .ally-slot-name { color:#ffffff22 !important; text-decoration:line-through; }
+    #trial-banner { position:fixed; top:14px; left:50%; transform:translateX(-50%);
+      background:rgba(0,180,80,0.12); border:1px solid #00cc66; border-radius:4px;
+      padding:8px 18px; font:11px/1 'Orbitron',monospace; letter-spacing:3px;
+      color:#00ff88; display:none; align-items:center; gap:16px; z-index:200; white-space:nowrap; }
+    #trial-exit-btn { background:transparent; border:1px solid #ff4444; color:#ff5555;
+      padding:5px 12px; font:10px/1 'Orbitron',monospace; letter-spacing:2px;
+      text-transform:uppercase; border-radius:3px; cursor:pointer; }
+    #trial-exit-btn:hover { background:rgba(255,68,68,0.15); color:#ff8888; }
+    #team-match-hud { position:absolute; top:56px; left:50%; transform:translateX(-50%);
+      background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.13); border-radius:6px;
+      padding:7px 22px 9px; display:none; flex-direction:column; align-items:center; gap:4px;
+      z-index:50; pointer-events:none; }
+    #team-timer-label { font:8px/1 'Orbitron',monospace; letter-spacing:3px; color:#ffffff44; }
+    #team-timer-val { font:24px/1 'Orbitron',monospace; color:#00eeff; text-shadow:0 0 12px #00eeff; letter-spacing:2px; }
+    #team-score-row { display:flex; gap:10px; align-items:center; margin-top:2px; }
+    .team-score-lbl { font:7px/1 'Orbitron',monospace; letter-spacing:2px; margin-bottom:2px; }
+    #team-score-our-wrap { display:flex; flex-direction:column; align-items:center; }
+    #team-score-their-wrap { display:flex; flex-direction:column; align-items:center; }
+    #team-score-our { font:18px/1 'Orbitron',monospace; color:#00ff88; text-shadow:0 0 8px #00ff88; }
+    #team-score-their { font:18px/1 'Orbitron',monospace; color:#ff3300; text-shadow:0 0 8px #ff3300; }
+    #team-score-sep { font:12px/1 'Orbitron',monospace; color:#ffffff33; margin-top:6px; }
+    #player-resp-overlay { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      display:none; flex-direction:column; align-items:center; gap:10px; pointer-events:none; }
+    #player-resp-label { font:11px/1 'Orbitron',monospace; letter-spacing:5px; color:#ff7777; }
+    #player-resp-count { font:52px/1 'Orbitron',monospace; color:#ff3300; text-shadow:0 0 24px #ff3300; }
+  </style>
+</head>
+<body>
+  <div id="scanlines"></div>
+  <canvas id="canvas"></canvas>
+
+  <!-- ═══ LOCK-ON INDICATOR (positioned by JS) ═══ -->
+  <div id="lk-indicator">
+    <div class="lk-corner lk-tl"></div>
+    <div class="lk-corner lk-tr"></div>
+    <div class="lk-corner lk-bl"></div>
+    <div class="lk-corner lk-br"></div>
+    <svg viewBox="0 0 80 80" width="80" height="80" style="position:absolute;top:0;left:0;pointer-events:none">
+      <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,136,0,0.12)" stroke-width="1.5"/>
+      <circle id="lk-arc-fill" cx="40" cy="40" r="32" fill="none" stroke="#ff8800" stroke-width="2"
+        stroke-dasharray="0 201" stroke-linecap="round"
+        style="transform-origin:40px 40px;transform:rotate(-90deg)"/>
+    </svg>
+    <div id="lk-label">LOCKING</div>
+  </div>
+
+  <div id="crosshair">
+    <div class="ch-ring"></div><div class="ch-dot"></div>
+    <div class="ch-line t"></div><div class="ch-line b"></div>
+    <div class="ch-line l"></div><div class="ch-line r"></div>
+    <svg style="position:absolute;top:0;left:0;width:44px;height:44px;overflow:visible;" viewBox="0 0 44 44">
+      <circle id="heat-arc" cx="22" cy="22" r="22"
+        fill="none" stroke="#00eeff" stroke-width="2.5"
+        stroke-dasharray="138.23" stroke-dashoffset="138.23"
+        stroke-linecap="round"
+        transform="rotate(-90 22 22)"
+        opacity="0.85"/>
+    </svg>
+  </div>
+
+  <!-- ═══ LOGIN SCREEN ═══ -->
+  <div id="login-screen" class="screen">
+    <div class="title">STELLAR<br>ASSAULT</div>
+    <div class="subtitle">3D Space Combat Simulator</div>
+    <div id="login-card">
+      <div class="login-tabs">
+        <button class="login-tab active" id="tab-signin">SIGN IN</button>
+        <button class="login-tab"        id="tab-create">NEW ACCOUNT</button>
+      </div>
+      <input id="login-user" class="login-input" type="text"     placeholder="USERNAME"  maxlength="20" autocomplete="off" spellcheck="false" />
+      <input id="login-pass" class="login-input" type="password" placeholder="PASSWORD"  maxlength="40" autocomplete="off" />
+      <div id="login-err"></div>
+      <div id="login-success"></div>
+      <button id="login-submit-btn" class="btn">SIGN IN</button>
+    </div>
+  </div>
+
+  <!-- ═══ HOME SCREEN ═══ -->
+  <div id="home-screen" class="screen" style="display:none">
+    <div class="title">STELLAR<br>ASSAULT</div>
+    <div class="subtitle">3D Space Combat Simulator</div>
+    <div id="home-user-bar">
+      <button id="portal-back-btn" onclick="window.location.href='/'" title="Back to Portal">◀ SCORESPHERE</button>
+      <span id="home-user-name">COMMANDER: —</span>
+      <button id="signout-btn">SIGN OUT</button>
+    </div>
+    <button class="btn"           id="start-btn">SURVIVAL MODE</button>
+    <button class="btn-red btn"   id="team-btn">⚔ 5v5 TEAM BATTLE</button>
+    <button class="btn-green btn" id="campaign-btn">CAMPAIGN  (200 LEVELS)</button>
+    <button class="btn-cyan btn"    id="training-btn">◎ TRAINING  (500 LESSONS)</button>
+    <button class="btn-orange btn" id="challenge-btn">⚡ DAILY CHALLENGE</button>
+    <button class="btn-gold btn"   id="hangar-btn">SHIP HANGAR</button>
+    <div class="ctrl-list">
+      <span>MOUSE / TRACKPAD</span> — steer &nbsp;|&nbsp; <span>Z</span> — accelerate &nbsp;|&nbsp; <span>SPACE / CLICK</span> — fire &nbsp;|&nbsp; <span>ESC</span> — pause
+    </div>
+    <div id="home-hs"></div>
+    <div id="home-chips"></div>
+    <div id="home-skill-rating"></div>
+  </div>
+
+  <!-- ═══ BATTLE MODE DIALOG ═══ -->
+  <div id="sa-battle-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,16,.88);z-index:9000;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:'Orbitron',monospace;">
+    <div style="font-size:1.4em;letter-spacing:.22em;color:#ff4444;text-shadow:0 0 20px #ff4444;">⚔ 5v5 TEAM BATTLE</div>
+    <div style="font-size:.72em;letter-spacing:.14em;color:#668;margin-bottom:6px;">CHOOSE MODE</div>
+    <button id="sa-battle-ai"     class="btn btn-red"   style="min-width:220px;">▶ VS AI  (LOCAL)</button>
+    <button id="sa-battle-online" class="btn btn-cyan"  style="min-width:220px;">🌐 ONLINE  5v5</button>
+    <button id="sa-battle-cancel" class="btn"           style="min-width:220px;font-size:.8em;">✕ CANCEL</button>
+  </div>
+
+  <!-- ═══ ONLINE LOBBY ═══ -->
+  <div id="sa-lobby" style="display:none;position:fixed;inset:0;background:rgba(0,0,16,.92);z-index:9001;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:'Orbitron',monospace;">
+    <div style="font-size:1.3em;letter-spacing:.2em;color:#00ddff;text-shadow:0 0 16px #00ddff;">ONLINE LOBBY</div>
+    <div id="sa-room-id" style="font-size:.68em;color:#446;letter-spacing:.12em;">CONNECTING…</div>
+    <div id="sa-lobby-list" style="display:flex;flex-direction:column;gap:6px;min-width:280px;"></div>
+    <div id="sa-lobby-status" style="font-size:.68em;color:#00ddff;letter-spacing:.12em;animation:blink2 1.2s step-end infinite;">WAITING FOR PLAYERS…</div>
+    <button id="sa-lobby-cancel" class="btn" style="margin-top:8px;font-size:.78em;color:#f44;border-color:#f44;min-width:180px;">✕ CANCEL</button>
+    <style>@keyframes blink2{0%,100%{opacity:1;}50%{opacity:.28;}}</style>
+  </div>
+
+  <!-- ═══ GAME OVER SCREEN ═══ -->
+  <div id="go-screen" class="screen">
+    <div class="go-title">MISSION FAILED</div>
+    <div id="go-mode">SURVIVAL MODE</div>
+    <div class="go-score" id="go-score-val">SCORE: 0</div>
+    <div class="go-hs"    id="go-hs-val">HIGH SCORE: 0</div>
+    <div class="go-new"   id="go-new-rec" style="display:none">★  NEW RECORD  ★</div>
+    <table id="score-tbl"><tbody id="score-tbody"></tbody></table>
+    <button class="btn"         id="retry-btn">RETRY MISSION</button>
+    <button class="btn btn-red" id="home-btn">MAIN MENU</button>
+  </div>
+
+  <!-- ═══ PAUSE SCREEN ═══ -->
+  <div id="pause-screen" class="screen">
+    <div class="pause-title">— PAUSED —</div>
+    <button class="btn"         id="resume-btn">RESUME</button>
+    <button class="btn btn-yellow" id="leave-campaign-btn" style="display:none">LEAVE CAMPAIGN</button>
+    <button class="btn btn-red" id="quit-btn">QUIT TO MENU</button>
+  </div>
+
+  <!-- ═══ SHIP HANGAR ═══ -->
+  <div id="hangar-screen" class="screen">
+    <div class="hangar-header">
+      <div class="hangar-title">⬡ SHIP HANGAR</div>
+      <div class="hangar-chips-display">CHIPS: <span id="hangar-chips-val">0</span></div>
+    </div>
+    <div id="ship-grid"></div>
+    <div class="hangar-footer">
+      <button class="btn" id="hangar-back-btn">← BACK TO MENU</button>
+    </div>
+  </div>
+
+  <!-- ═══ CAMPAIGN SCREEN ═══ -->
+  <div id="campaign-screen" class="screen">
+    <div class="campaign-title">CAMPAIGN MODE</div>
+    <div class="campaign-sub">200 LEVELS · PROGRESSIVELY HARDER · FINAL BOSS</div>
+    <div id="cp-progress">NO PROGRESS SAVED</div>
+    <button class="btn-green btn" id="cp-continue-btn" style="display:none">CONTINUE</button>
+    <button class="btn"           id="cp-new-btn">START FROM LEVEL 1</button>
+    <button class="btn btn-red"   id="cp-back-btn">← BACK</button>
+  </div>
+
+  <!-- ═══ LORE SCREEN ═══ -->
+  <div id="lore-screen" class="screen">
+    <div class="lore-header">
+      <div class="lore-lvl-num" id="lore-lvl-num">LEVEL 1 / 200</div>
+      <div class="lore-chapter tier-c" id="lore-chapter">CHAPTER I — CORSAIR</div>
+    </div>
+    <div class="lore-content">
+      <div id="lore-title">THE SURVIVOR</div>
+      <div id="lore-text"></div>
+      <div class="lore-divider"></div>
+      <div id="lore-quote"></div>
+      <div id="lore-speaker"></div>
+    </div>
+    <div class="lore-footer">
+      <button class="btn btn-yellow" id="lore-leave-btn">LEAVE CAMPAIGN</button>
+      <button class="btn-green btn" id="lore-engage-btn">ENGAGE</button>
+    </div>
+  </div>
+
+  <!-- ═══ TRAINING HUB ═══ -->
+  <div id="training-screen" class="screen">
+    <div class="training-header">
+      <div class="training-title">◎ TRAINING</div>
+      <div class="training-prog" id="tr-total-prog">0 / 500 LESSONS COMPLETE</div>
+    </div>
+    <div class="training-body" id="tr-course-grid"></div>
+    <div style="padding:12px 24px 20px;flex-shrink:0;">
+      <button class="btn btn-red" id="training-back-btn">← BACK TO MENU</button>
+    </div>
+  </div>
+
+  <!-- ═══ TRAINING COURSE DETAIL ═══ -->
+  <div id="training-course-detail">
+    <div class="tcd-header">
+      <div class="tcd-icon" id="tcd-icon">◎</div>
+      <div class="tcd-name" id="tcd-name">COURSE NAME</div>
+      <div class="tcd-desc" id="tcd-desc">Course description</div>
+    </div>
+    <div class="tcd-lessons" id="tcd-lessons"></div>
+    <div class="tcd-footer">
+      <button class="btn btn-red" id="tcd-back-btn">← COURSES</button>
+    </div>
+  </div>
+
+  <!-- ═══ TRAINING LESSON INTRO ═══ -->
+  <div id="training-intro">
+    <div class="ti-chapter" id="ti-chapter">CHAPTER · FUNDAMENTALS</div>
+    <div class="ti-num"     id="ti-num">COURSE 1 · LESSON 1 OF 10</div>
+    <div class="ti-title"   id="ti-title">OBJECTIVE</div>
+    <div class="ti-box">
+      <div class="ti-obj-lbl">OBJECTIVE</div>
+      <div class="ti-obj" id="ti-obj">Kill 5 enemies.</div>
+      <div class="ti-hint-lbl">TACTICAL HINT</div>
+      <div class="ti-hint" id="ti-hint">Aim for center mass.</div>
+    </div>
+    <div class="ti-footer">
+      <button class="btn btn-red"  id="ti-back-btn">← BACK</button>
+      <button class="btn btn-gold" id="ti-theory-btn">◈ FIELD MANUAL</button>
+      <button class="btn-cyan btn" id="ti-start-btn">BEGIN LESSON</button>
+    </div>
+  </div>
+
+  <!-- ═══ TRAINING THEORY / FIELD MANUAL ═══ -->
+  <div id="training-theory">
+    <div class="tt-header">
+      <div class="tt-tag">◈ FIELD MANUAL</div>
+      <div class="tt-subtitle" id="tt-subtitle">COURSE 1 · LESSON 1</div>
+      <div class="tt-course-name" id="tt-course-name">TARGET ELIMINATION</div>
+    </div>
+    <div class="tt-scroll">
+      <div class="tt-inner">
+        <div class="tt-section">
+          <div class="tt-section-title">CONCEPT</div>
+          <div class="tt-concept-body" id="tt-concept-body"></div>
+        </div>
+        <div class="tt-section">
+          <div class="tt-section-title">KEY PRINCIPLES</div>
+          <div class="tt-principles" id="tt-principles"></div>
+        </div>
+        <div class="tt-section">
+          <div class="tt-section-title">◉ LIVE TACTICAL SIMULATION</div>
+          <div class="tt-demo-wrap">
+            <canvas id="tt-demo-canvas" width="480" height="260"></canvas>
+            <div id="tt-demo-anim-label"> </div>
+            <div class="tt-demo-caption">TOP-DOWN SCHEMATIC · LOOPS CONTINUOUSLY</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tt-footer">
+      <button class="btn btn-red" id="tt-back-btn">← BACK TO LESSON</button>
+      <button class="btn-cyan btn" id="tt-to-intro-btn">BEGIN LESSON →</button>
+    </div>
+  </div>
+
+  <!-- ═══ TRAINING RESULT OVERLAY ═══ -->
+  <div id="training-result">
+    <div class="tr-verdict" id="tr-verdict">PASS</div>
+    <div class="tr-detail"  id="tr-detail">Objective complete.</div>
+    <div class="tr-btns">
+      <button class="btn btn-red"  id="tr-retry-btn">RETRY</button>
+      <button class="btn-cyan btn" id="tr-next-btn">NEXT LESSON →</button>
+    </div>
+  </div>
+
+  <!-- ═══ TRAINING IN-GAME HUD ═══ -->
+  <div id="training-hud">
+    <div id="th-label">OBJECTIVE</div>
+    <div id="th-obj">KILL 5 TARGETS — 0 / 5</div>
+    <div id="th-bar-bg"><div id="th-bar" style="width:0%"></div></div>
+  </div>
+
+  <!-- ═══ DAILY CHALLENGE SCREEN ═══ -->
+  <div id="challenge-screen" class="screen">
+    <div class="ch-day-tag">⚡ DAILY CHALLENGE</div>
+    <div class="ch-date" id="ch-date">— — —</div>
+    <div class="ch-tz" id="ch-tz">SYNCED TO YOUR LOCAL CLOCK</div>
+    <div id="ch-card">
+      <div id="ch-title">SCORCHED RUN</div>
+      <div id="ch-flavor">Flavor text.</div>
+      <div id="ch-mods"></div>
+      <div id="ch-goal">OBJECTIVE: KILL 7 ENEMIES</div>
+    </div>
+    <div id="ch-completed" style="display:none">✓ COMPLETED TODAY</div>
+    <div class="ch-btns">
+      <button class="btn btn-red"    id="ch-back-btn">← MENU</button>
+      <button class="btn btn-orange" id="ch-start-btn">⚡ ACCEPT CHALLENGE</button>
+    </div>
+  </div>
+
+  <!-- ═══ CHALLENGE IN-GAME HUD ═══ -->
+  <div id="challenge-hud">
+    <div id="ch-hud-label">⚡ DAILY CHALLENGE</div>
+    <div id="ch-hud-obj">KILL 7 TARGETS — 0 / 7</div>
+    <div id="ch-hud-timer" style="display:none">⏱ 01:00</div>
+    <div id="ch-hud-bar-bg"><div id="ch-hud-bar" style="width:0%"></div></div>
+  </div>
+
+  <!-- ═══ CHALLENGE RESULT OVERLAY ═══ -->
+  <div id="challenge-result">
+    <div class="chr-verdict" id="chr-verdict">CHALLENGE COMPLETE</div>
+    <div class="chr-reason"  id="chr-reason"></div>
+    <div class="chr-detail"  id="chr-detail">All targets eliminated.</div>
+    <div class="chr-btns">
+      <button class="btn btn-red"    id="chr-menu-btn">← MENU</button>
+      <button class="btn btn-orange" id="chr-retry-btn">↺ RETRY</button>
+    </div>
+  </div>
+
+  <!-- ═══ LEVEL COMPLETE OVERLAY ═══ -->
+  <div id="lvlcomplete-screen">
+    <div class="lc-title"  id="lc-level">LEVEL 1 COMPLETE</div>
+    <div class="lc-chips"  id="lc-chips">+200 CHIPS THIS LEVEL</div>
+    <div class="lc-total"  id="lc-total">TOTAL CHIPS: 200</div>
+    <button class="btn-green btn" id="lc-next-btn" style="margin-top:8px;">NEXT LEVEL →</button>
+  </div>
+
+  <!-- ═══ VICTORY SCREEN ═══ -->
+  <div id="victory-screen" class="screen">
+    <div class="victory-title">VICTORY</div>
+    <div class="victory-sub">THE DREADNOUGHT HAS BEEN DESTROYED</div>
+    <div class="victory-desc">
+      You have conquered all 200 levels of the Stellar Assault campaign.<br>
+      The galaxy is safe — for now.
+    </div>
+    <div id="victory-chips"></div>
+    <button class="btn-gold btn" id="victory-replay-btn">PLAY AGAIN (LVL 1)</button>
+    <button class="btn btn-red"  id="victory-home-btn">MAIN MENU</button>
+  </div>
+
+  <!-- ═══ HUD ═══ -->
+  <div id="target-arrows"></div>
+  <div id="enemy-hp-bars"></div>
+
+  <div id="hud">
+    <div id="hud-score">SCORE: <span id="sv">0</span></div>
+    <div id="hud-chips">✦ <span id="chips-val">0</span></div>
+    <div id="hud-wave"><span id="hud-wave-label">WAVE</span> <span id="wv">1</span></div>
+    <div id="hud-enemies">ENEMIES: <span id="ev">0</span><br>KILLS: <span id="kv">0</span></div>
+
+    <div id="hud-enemy-hp">
+      <div class="bar-lbl" id="enemy-hp-lbl">ENEMY</div>
+      <div class="bar-bg"><div class="bar-fill" id="enemy-hp-fill"></div></div>
+    </div>
+    <div id="hud-hp">
+      <div class="bar-lbl" id="hp-lbl">HEALTH</div>
+      <div class="bar-bg"><div class="bar-fill" id="hp-fill"></div></div>
+    </div>
+    <div id="hud-heat" style="display:none">
+      <div class="bar-lbl" id="heat-lbl">CANNON HEAT</div>
+      <div class="bar-bg"><div class="bar-fill" id="heat-fill"></div></div>
+      <div id="heat-warn">⚠ OVERHEATED</div>
+    </div>
+
+    <!-- Boss HP bar (center bottom, only shown during boss fight) -->
+    <div id="boss-hp-wrap">
+      <div id="boss-hp-txt">⚔ THE DREADNOUGHT</div>
+      <div id="boss-hp-bar-bg"><div id="boss-hp-fill"></div></div>
+    </div>
+
+    <!-- Missile ammo (only shown for homing ships) -->
+    <div id="missile-hud">
+      <div id="missile-lbl">MISSILES</div>
+      <div id="missile-pips"></div>
+      <div id="missile-reload"></div>
+    </div>
+
+    <!-- Venom charges (only shown for ARSENIC) -->
+    <div id="venom-hud">
+      <div id="venom-lbl">VENOM</div>
+      <div id="venom-pips"></div>
+      <div id="venom-reload"></div>
+    </div>
+
+    <div id="wave-msg"></div>
+    <div id="kill-msg">ENEMY DOWN</div>
+    <div id="dmg-vig"></div>
+    <div id="speed-hint">HOLD Z TO ACCELERATE</div>
+    <div id="ally-hud">
+      <div class="ally-hud-title">ALLIES</div>
+      <div id="ally-slots"></div>
+    </div>
+    <div id="trial-banner">
+      TRIAL: <span id="trial-ship-name">SCOUT FIGHTER</span>
+      <button id="trial-exit-btn">✕ EXIT TRIAL</button>
+    </div>
+    <div id="team-match-hud">
+      <div id="team-timer-label">MATCH TIME</div>
+      <div id="team-timer-val">2:00</div>
+      <div id="team-score-row">
+        <div id="team-score-our-wrap">
+          <div class="team-score-lbl" style="color:#00ff88">OUR KILLS</div>
+          <div id="team-score-our">0</div>
+        </div>
+        <div id="team-score-sep">vs</div>
+        <div id="team-score-their-wrap">
+          <div class="team-score-lbl" style="color:#ff3300">ENEMY KILLS</div>
+          <div id="team-score-their">0</div>
+        </div>
+      </div>
+    </div>
+    <div id="player-resp-overlay">
+      <div id="player-resp-label">RESPAWNING IN</div>
+      <div id="player-resp-count">15</div>
+    </div>
+  </div>
+
+  <!-- Three.js core -->
+  <!-- Touch controls (shown only on touch-capable devices during gameplay) -->
+  <div id="touch-controls">
+    <div id="touch-steer-zone">
+      <div id="touch-steer-hint">drag to steer</div>
+    </div>
+    <div id="touch-joystick-base"></div>
+    <div id="touch-joystick-knob"></div>
+    <button id="touch-throttle-btn">THROTTLE</button>
+    <button id="touch-fire-btn">FIRE</button>
+    <button id="touch-pause-btn">⏸</button>
+  </div>
+
+  <script src="lib/three.min.js"></script>
+  <!-- Post-processing (bloom) -->
+  <script src="lib/LuminosityHighPassShader.js"></script>
+  <script src="lib/CopyShader.js"></script>
+  <script src="lib/EffectComposer.js"></script>
+  <script src="lib/RenderPass.js"></script>
+  <script src="lib/UnrealBloomPass.js"></script>
+  <script src="lib/FXAAShader.js"></script>
+  <script src="lib/ShaderPass.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

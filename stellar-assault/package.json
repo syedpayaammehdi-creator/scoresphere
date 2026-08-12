@@ -1,0 +1,9 @@
+{
+  "name": "stellar-assault",
+  "version": "1.0.0",
+  "description": "STELLAR ASSAULT — 3D space shooter",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
