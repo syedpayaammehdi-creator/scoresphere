@@ -1726,10 +1726,6 @@
   var hasTouchScreen = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
   var steerTouchId = null, steerPrevX = 0, steerPrevY = 0;
   var TOUCH_MULT = 1.6;
-  // Joystick state — read directly in update() each frame, scaled by dt
-  var joyBaseX = 0, joyBaseY = 0, joyOffsetX = 0, joyOffsetY = 0;
-  // 90°/s at full stick deflection — less snappy than desktop mouse, more controlled
-  var JOY_RATE = (Math.PI * 0.5) / MOUSE_SENS;
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
   var homeEl       = document.getElementById('home-screen');
@@ -4827,57 +4823,38 @@
     if (!hasTouchScreen) return;
 
     var steerZone   = document.getElementById('touch-steer-zone');
-    var joystickBase= document.getElementById('touch-joystick-base');
-    var joystickKnob= document.getElementById('touch-joystick-knob');
     var fireBtn     = document.getElementById('touch-fire-btn');
     var throttleBtn = document.getElementById('touch-throttle-btn');
     var pauseBtn    = document.getElementById('touch-pause-btn');
 
-    // ── Steering ────────────────────────────────────────────────────────────
+    // ── Steering: free swipe, same relative-delta model as desktop mouselook ──
+    // (no anchored joystick knob — swipe any direction, any distance, to turn;
+    // the turn stops the instant your finger stops moving, just like a trackpad)
     steerZone.addEventListener('touchstart', function(e) {
       e.preventDefault();
       if (gameState !== 'playing') return;
       var t = e.changedTouches[0];
       steerTouchId = t.identifier;
-      joyBaseX = t.clientX;
-      joyBaseY = t.clientY;
-      joyOffsetX = 0; joyOffsetY = 0;
-      joystickBase.style.left    = t.clientX + 'px';
-      joystickBase.style.top     = t.clientY + 'px';
-      joystickBase.style.display = 'block';
-      joystickKnob.style.left    = t.clientX + 'px';
-      joystickKnob.style.top     = t.clientY + 'px';
-      joystickKnob.style.display = 'block';
-      // joyOffsetX/Y are read every frame in update() — no interval needed
+      steerPrevX = t.clientX;
+      steerPrevY = t.clientY;
     }, { passive: false });
 
     steerZone.addEventListener('touchmove', function(e) {
       e.preventDefault();
       if (gameState !== 'playing') return;
-      var maxR = 45;
       for (var i = 0; i < e.changedTouches.length; i++) {
         var t = e.changedTouches[i];
         if (t.identifier !== steerTouchId) continue;
-        var dx = t.clientX - joyBaseX, dy = t.clientY - joyBaseY;
-        var dist = Math.sqrt(dx*dx + dy*dy);
-        // Normalised offset -1..1 drives continuous turning speed
-        joyOffsetX = Math.max(-1, Math.min(1, dx / maxR));
-        joyOffsetY = Math.max(-1, Math.min(1, dy / maxR));
-        // Clamp knob visual within maxR
-        if (dist > maxR) { dx = dx/dist*maxR; dy = dy/dist*maxR; }
-        joystickKnob.style.left = (joyBaseX + dx) + 'px';
-        joystickKnob.style.top  = (joyBaseY + dy) + 'px';
+        mouseDx += (t.clientX - steerPrevX) * TOUCH_MULT;
+        mouseDy += (t.clientY - steerPrevY) * TOUCH_MULT;
+        steerPrevX = t.clientX;
+        steerPrevY = t.clientY;
       }
     }, { passive: false });
 
     function endSteer(e) {
       for (var i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === steerTouchId) {
-          steerTouchId = null;
-          joyOffsetX = 0; joyOffsetY = 0;
-          joystickBase.style.display = 'none';
-          joystickKnob.style.display = 'none';
-        }
+        if (e.changedTouches[i].identifier === steerTouchId) steerTouchId = null;
       }
     }
     steerZone.addEventListener('touchend',    endSteer, { passive: false });
@@ -7268,11 +7245,8 @@
   function update(dt) {
     if (gameState !== 'playing') return;
 
-    // Inject touch joystick scaled by dt (frame-rate independent, no interval jitter)
-    if (hasTouchScreen && (joyOffsetX !== 0 || joyOffsetY !== 0)) {
-      mouseDx += joyOffsetX * JOY_RATE * dt;
-      mouseDy += joyOffsetY * JOY_RATE * dt;
-    }
+    // Touch swipe deltas are added straight into mouseDx/mouseDy as they happen
+    // (see touchmove in initTouchControls) — same accumulator desktop mouselook uses.
     // Always drain accumulated input so it doesn't build up during respawn
     var _mdx = mouseDx, _mdy = mouseDy;
     mouseDx = 0; mouseDy = 0;

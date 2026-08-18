@@ -399,24 +399,6 @@ nav{
   background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,0.7) 0%,transparent 70%);
 }
 
-/* ── Orbit Rush card art ── */
-.art-orbit{
-  background:
-    radial-gradient(ellipse 80% 55% at 50% 40%,rgba(132,204,22,0.3) 0%,transparent 70%),
-    radial-gradient(ellipse 55% 45% at 75% 65%,rgba(234,179,8,0.25) 0%,transparent 65%),
-    linear-gradient(170deg,#040800 0%,#0a1200 45%,#06060e 100%);
-}
-.art-orbit::before{
-  content:'🔺';position:absolute;color:#a3e635;
-  font-size:76px;top:30%;left:50%;transform:translate(-50%,-50%);
-  filter:drop-shadow(0 0 30px rgba(132,204,22,0.9));
-  animation:float 2.6s ease-in-out infinite;
-}
-.art-orbit::after{
-  content:'';position:absolute;inset:0;
-  background:radial-gradient(ellipse 100% 40% at 50% 100%,rgba(0,0,0,0.7) 0%,transparent 70%);
-}
-
 /* ── Redline card art ── */
 .art-redline{
   background:
@@ -836,23 +818,6 @@ footer span{color:rgba(255,255,255,.25);}
       </div>
       <p class="card-desc">A branching stick-figure heist comedy. Every choice leads somewhere new — pull off the perfect job, or fail spectacularly. 50+ endings to find.</p>
       <button class="play-btn" style="background:linear-gradient(135deg,#7c3aed,#4c1d95);">▶ &nbsp;Play Now</button>
-    </div>
-  </div>
-
-  <!-- ORBIT RUSH -->
-  <div class="card" onclick="window.location.href='orbit-rush/index.html'">
-    <div class="card-art art-orbit"></div>
-    <div class="card-badge" style="background:linear-gradient(135deg,#84cc16,#a16207);box-shadow:0 0 18px rgba(132,204,22,.5);">Vector Arcade</div>
-    <div class="card-content">
-      <div class="card-tag" style="background:rgba(132,204,22,0.1);border-color:rgba(132,204,22,0.35);color:#a3e635;">🔺 Twin-Stick</div>
-      <h2 class="card-title" style="text-shadow:0 0 40px rgba(132,204,22,.6);">Orbit<br>Rush</h2>
-      <div class="card-meta">
-        <div class="card-stat"><span class="card-stat-label">Enemies</span><span class="card-stat-val">4 Types</span></div>
-        <div class="card-stat"><span class="card-stat-label">Waves</span><span class="card-stat-val">∞</span></div>
-        <div class="card-stat"><span class="card-stat-label">Arena</span><span class="card-stat-val">Wrap</span></div>
-      </div>
-      <p class="card-desc">Retro vector arena shooter. Screen-wrapping chaos, splitting enemies, and boss waves every fifth round. Classic arcade, twin-stick controls.</p>
-      <button class="play-btn" style="background:linear-gradient(135deg,#84cc16,#a16207);">▶ &nbsp;Play Now</button>
     </div>
   </div>
 
