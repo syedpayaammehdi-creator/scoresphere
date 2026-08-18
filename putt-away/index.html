@@ -189,7 +189,7 @@ canvas{display:block;position:fixed;inset:0;z-index:0;}
 'use strict';
 
 // ── CONSTANTS ─────────────────────────────────────────────
-var G=-.006, BOUNCE=.28, BALL_R=.4, CAM_DIST=9, CAM_H=4.5, TRAJ_YARDS=5;
+var G=-.006, BOUNCE=.28, BALL_R=.4, CAM_DIST=13, CAM_H=7.5, TRAJ_YARDS=5;
 
 // ── CLUBS ─────────────────────────────────────────────────
 var CLUBS=[
@@ -1274,7 +1274,10 @@ function showGameOver(){
 // ── LOAD HOLE ────────────────────────────────────────────
 function loadHole(idx){
   buildHole(HOLES[idx]); makeBall(); placeBallAtTee(); makeTrajectory();
-  aimYaw=Math.atan2(HOLES[idx].gr.x,HOLES[idx].gr.z); aimPitch=0;
+  // Shot/camera formulas elsewhere use vz ∝ -cos(aimYaw), so the initial aim
+  // must be solved against that same convention (negate gr.z) or every hole starts
+  // facing exactly opposite the green.
+  aimYaw=Math.atan2(HOLES[idx].gr.x,-HOLES[idx].gr.z); aimPitch=0;
   camPos.set(0,8,14); camTgt.set(0,2,-5);
   gs='aim'; clubIdx=0;
   updateHUD(); updateTrajectory(.75);
@@ -1339,6 +1342,12 @@ function loop(ts){
   }
   if(ballMesh) updateCamera();
   renderer.render(scene,camera);
+  if (window.__PA_DEBUG && (ts|0)%1000<20) console.log('[dbg]', JSON.stringify({
+    gs:gs, camPos:{x:camPos.x.toFixed(2),y:camPos.y.toFixed(2),z:camPos.z.toFixed(2)},
+    ball: ballMesh?{x:ballMesh.position.x.toFixed(2),y:ballMesh.position.y.toFixed(2),z:ballMesh.position.z.toFixed(2)}:null,
+    aimYaw: aimYaw.toFixed(3), fov: camera.fov, aspect: camera.aspect.toFixed(3),
+    hole: HOLES[holeIdx] ? {name:HOLES[holeIdx].name, fw:HOLES[holeIdx].fw, gr:HOLES[holeIdx].gr} : null
+  }));
 }
 
 window.addEventListener('resize',function(){

@@ -1202,31 +1202,80 @@ function drawMachine(m){
   drawItemDots(m.inBuf, px+def.w*CELL-8, py+10, true);
 }
 
+function _rrectPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
 function drawMachineAt(def,col,row,flash,borderOverride){
   var px=col*CELL+camX, py=row*CELL+camY;
   var w=def.w*CELL, h=def.h*CELL;
-  ctx.fillStyle=flash?'#3a5a7a':def.color;
-  ctx.fillRect(px+2,py+2,w-4,h-4);
+  var bx=px+2, by=py+2, bw=w-4, bh=h-4;
+
+  // Soft drop shadow beneath the tile for a bit of lift off the grid
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,.55)'; ctx.shadowBlur=8; ctx.shadowOffsetY=3;
+  ctx.fillStyle='rgba(0,0,0,.001)';
+  _rrectPath(ctx,bx,by,bw,bh,6); ctx.fill();
+  ctx.restore();
+
+  // Vertical gradient fill (lighter top edge, darker base) instead of a flat block
+  var grad=ctx.createLinearGradient(0,by,0,by+bh);
+  var baseCol=flash?'#3a5a7a':def.color;
+  grad.addColorStop(0, _lighten(baseCol,18));
+  grad.addColorStop(1, _lighten(baseCol,-14));
+  ctx.fillStyle=grad;
+  _rrectPath(ctx,bx,by,bw,bh,6); ctx.fill();
+
+  // Subtle top highlight sheen
+  var sheen=ctx.createLinearGradient(0,by,0,by+bh*0.4);
+  sheen.addColorStop(0,'rgba(255,255,255,.10)'); sheen.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=sheen; _rrectPath(ctx,bx,by,bw,bh*0.4,6); ctx.fill();
+
+  ctx.save();
+  if (flash){ ctx.shadowColor=borderOverride||def.border; ctx.shadowBlur=10; }
   ctx.strokeStyle=borderOverride||def.border; ctx.lineWidth=flash?2.5:1.5;
-  ctx.strokeRect(px+2,py+2,w-4,h-4);
+  _rrectPath(ctx,bx,by,bw,bh,6); ctx.stroke();
+  ctx.restore();
+
   ctx.fillStyle=borderOverride||def.border;
   [[px+5,py+5],[px+w-7,py+5],[px+5,py+h-7],[px+w-7,py+h-7]].forEach(function(pt){
     ctx.beginPath();ctx.arc(pt[0],pt[1],2,0,Math.PI*2);ctx.fill();
   });
   ctx.font=(w>80?'20px':'16px')+' serif';
   ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=4;
   ctx.fillText(def.icon,px+w/2,py+h/2-5);
+  ctx.shadowBlur=0;
   ctx.font='bold 7px Courier New'; ctx.fillStyle='rgba(255,255,255,.65)';
   ctx.fillText(def.name.toUpperCase(),px+w/2,py+h/2+9);
   ctx.textAlign='left';
 }
 
+function _lighten(hex,amt){
+  hex=hex.replace('#','');
+  if(hex.length===3) hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  var num=parseInt(hex,16);
+  var r=Math.max(0,Math.min(255,(num>>16)+amt));
+  var g=Math.max(0,Math.min(255,((num>>8)&0xff)+amt));
+  var b=Math.max(0,Math.min(255,(num&0xff)+amt));
+  return 'rgb('+r+','+g+','+b+')';
+}
+
 function drawConveyor(cv){
   var px=cv.col*CELL+camX, py=cv.row*CELL+camY;
   var cx2=px+CELL/2, cy2=py+CELL/2;
-  // Belt tracks
-  ctx.fillStyle='#302400'; ctx.fillRect(px+4,py+4,CELL-8,CELL-8);
-  ctx.strokeStyle='#685010'; ctx.lineWidth=1; ctx.strokeRect(px+4,py+4,CELL-8,CELL-8);
+  // Belt tracks — subtle gradient instead of a flat fill
+  var bgrad=ctx.createLinearGradient(0,py+4,0,py+CELL-4);
+  bgrad.addColorStop(0,'#241c00'); bgrad.addColorStop(1,'#3a2c00');
+  ctx.fillStyle=bgrad;
+  _rrectPath(ctx,px+4,py+4,CELL-8,CELL-8,3); ctx.fill();
+  ctx.strokeStyle='#685010'; ctx.lineWidth=1; _rrectPath(ctx,px+4,py+4,CELL-8,CELL-8,3); ctx.stroke();
   // Direction arrow
   ctx.strokeStyle='#f5a400'; ctx.lineWidth=1.5; ctx.beginPath();
   var as=7;

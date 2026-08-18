@@ -205,14 +205,30 @@ function burst(pos, color, count, power){
 function updateParticles(dt){
   for (var i=particles.length-1;i>=0;i--){
     var p=particles[i];
-    p.vel.y -= 18*dt;
+    if (p.isSmoke){ p.vel.y += 1.4*dt; p.vel.multiplyScalar(1-0.6*dt); p.mesh.scale.multiplyScalar(1+0.7*dt); }
+    else p.vel.y -= 18*dt;
     p.mesh.position.addScaledVector(p.vel, dt);
     p.life -= dt;
-    p.mesh.material.opacity = Math.max(0, p.life/p.max);
+    p.mesh.material.opacity = Math.max(0, (p.life/p.max) * (p.isSmoke?0.35:1));
     p.mesh.material.transparent = true;
-    p.mesh.scale.setScalar(Math.max(0.05, p.life/p.max));
+    if (!p.isSmoke) p.mesh.scale.setScalar(Math.max(0.05, p.life/p.max));
     if (p.life<=0){ scene.remove(p.mesh); p.mesh.material.dispose(); particles.splice(i,1); }
   }
+}
+var smokeCooldownByCarId = new WeakMap();
+function emitSmoke(car){
+  var dmg = car.damage;
+  if (dmg < 45) return;
+  var cd = smokeCooldownByCarId.get(car) || 0;
+  if (cd > 0){ smokeCooldownByCarId.set(car, cd-1); return; }
+  smokeCooldownByCarId.set(car, Math.max(2, Math.floor(8 - dmg/15))); // heavier damage = denser smoke
+  var fwd = car.forwardVec();
+  var mat = new THREE.MeshBasicMaterial({ color: dmg>80?0x1a1a1a:0x555555 });
+  var m = new THREE.Mesh(partGeo, mat);
+  m.position.set(car.x + fwd.x*1.7, 0.55, car.z + fwd.z*1.7);
+  m.scale.setScalar(0.6);
+  scene.add(m);
+  particles.push({ mesh:m, vel:new THREE.Vector3((Math.random()-0.5)*0.5,1.2+Math.random()*0.6,(Math.random()-0.5)*0.5), life:1.2+Math.random()*0.6, max:1.8, isSmoke:true });
 }
 
 // ── Skid marks ───────────────────────────────────────────────────────────
@@ -233,36 +249,83 @@ function addSkid(x,z,ang){
 // ══════════════════════════════════════════════════════════════════════════
 function buildCarMesh(bodyColor, isCop){
   var g = new THREE.Group();
-  var bodyMat = new THREE.MeshStandardMaterial({ color:bodyColor, roughness:0.35, metalness:0.55 });
-  var body = new THREE.Mesh(new THREE.BoxGeometry(1.9,0.6,4.0), bodyMat);
-  body.position.y = 0.55; g.add(body); g.userData.body = body;
-  var cabin = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.5,2.0), new THREE.MeshStandardMaterial({color:0x0a0c12,roughness:0.2,metalness:0.3}));
-  cabin.position.set(0,0.95,-0.2); g.add(cabin);
-  var frontBumper = new THREE.Mesh(new THREE.BoxGeometry(1.85,0.4,0.3), bodyMat);
-  frontBumper.position.set(0,0.45,1.95); g.add(frontBumper); g.userData.frontBumper = frontBumper;
-  var wheelGeo = new THREE.CylinderGeometry(0.36,0.36,0.32,10);
-  var wheelMat = new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.8 });
+  var bodyMat = new THREE.MeshStandardMaterial({ color:bodyColor, roughness:0.28, metalness:0.65, envMapIntensity:1.2 });
+  var glassMat = new THREE.MeshStandardMaterial({ color:0x0a0c12, roughness:0.08, metalness:0.2 });
+  var trimMat = new THREE.MeshStandardMaterial({ color:0x15161c, roughness:0.5, metalness:0.6 });
+
+  // Lower body — slightly tapered silhouette (wider at the doors than the nose/tail) for a
+  // less box-of-a-car look, built from a stack of boxes rather than one flat slab.
+  var body = new THREE.Mesh(new THREE.BoxGeometry(1.9,0.5,4.0), bodyMat);
+  body.position.y = 0.5; g.add(body); g.userData.body = body;
+  var beltline = new THREE.Mesh(new THREE.BoxGeometry(1.96,0.16,3.2), bodyMat);
+  beltline.position.set(0,0.78,0); g.add(beltline);
+
+  // Cabin/greenhouse with raked windshield + rear glass (angled boxes, not just a flat block)
+  var cabin = new THREE.Mesh(new THREE.BoxGeometry(1.55,0.5,2.0), bodyMat);
+  cabin.position.set(0,1.05,-0.15); g.add(cabin);
+  var windshield = new THREE.Mesh(new THREE.BoxGeometry(1.45,0.42,0.06), glassMat);
+  windshield.position.set(0,1.08,0.8); windshield.rotation.x = -0.32; g.add(windshield);
+  var rearGlass = new THREE.Mesh(new THREE.BoxGeometry(1.45,0.38,0.06), glassMat);
+  rearGlass.position.set(0,1.02,-1.1); rearGlass.rotation.x = 0.3; g.add(rearGlass);
+  var sideGlassL = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.34,1.7), glassMat);
+  sideGlassL.position.set(-0.77,1.05,-0.15); g.add(sideGlassL);
+  var sideGlassR = sideGlassL.clone(); sideGlassR.position.x = 0.77; g.add(sideGlassR);
+
+  // Mirrors
+  [-1, 1].forEach(function(side){
+    var mirror = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.22), trimMat);
+    mirror.position.set(side*1.0, 0.85, 0.55); g.add(mirror);
+  });
+
+  // Front + rear bumpers (front is the crumple target)
+  var frontBumper = new THREE.Mesh(new THREE.BoxGeometry(1.85,0.42,0.3), bodyMat);
+  frontBumper.position.set(0,0.42,1.95); g.add(frontBumper); g.userData.frontBumper = frontBumper;
+  var rearBumper = new THREE.Mesh(new THREE.BoxGeometry(1.85,0.4,0.24), trimMat);
+  rearBumper.position.set(0,0.4,-1.95); g.add(rearBumper);
+
+  // Wheels with a simple rim disc so they read as more than plain cylinders
+  var wheelGeo = new THREE.CylinderGeometry(0.36,0.36,0.32,12);
+  var wheelMat = new THREE.MeshStandardMaterial({ color:0x0c0c0c, roughness:0.75 });
+  var rimGeo = new THREE.CylinderGeometry(0.2,0.2,0.34,8);
+  var rimMat = new THREE.MeshStandardMaterial({ color:0xaaaaaa, roughness:0.35, metalness:0.85 });
   var wheels = [];
   [[-0.95,1.3],[0.95,1.3],[-0.95,-1.3],[0.95,-1.3]].forEach(function(p){
-    var w = new THREE.Mesh(wheelGeo, wheelMat);
-    w.rotation.z = Math.PI/2; w.position.set(p[0],0.36,p[1]); g.add(w); wheels.push(w);
+    var wg = new THREE.Group();
+    var w = new THREE.Mesh(wheelGeo, wheelMat); w.rotation.z = Math.PI/2; wg.add(w);
+    var rim = new THREE.Mesh(rimGeo, rimMat); rim.rotation.z = Math.PI/2; wg.add(rim);
+    wg.position.set(p[0],0.36,p[1]); g.add(wg); wheels.push(wg);
   });
   g.userData.wheels = wheels;
-  // headlights
+
+  // Headlights — two, one per side (previously a stray clone/reference mixup produced
+  // three overlapping spheres with one side missing its own independent instance)
   var hl1 = new THREE.PointLight(0xbfe0ff, isCop?0.9:1.4, isCop?14:20);
   hl1.position.set(0,0.6,2.2); g.add(hl1);
-  var hlMesh = new THREE.Mesh(new THREE.SphereGeometry(0.12,6,6), new THREE.MeshBasicMaterial({color:0xdff2ff}));
-  hlMesh.position.set(0.7,0.55,2.0); g.add(hlMesh.clone());
-  var hlMeshL = hlMesh.clone(); hlMeshL.position.x=-0.7; g.add(hlMeshL);
-  var hlMeshR = hlMesh; hlMeshR.position.x=0.7; g.add(hlMeshR);
-  // taillights
+  var hlGeo = new THREE.SphereGeometry(0.12,6,6);
+  var hlMat = new THREE.MeshBasicMaterial({color:0xdff2ff});
+  [-0.7, 0.7].forEach(function(sx){
+    var hlMesh = new THREE.Mesh(hlGeo, hlMat);
+    hlMesh.position.set(sx,0.55,2.0); g.add(hlMesh);
+  });
+
+  // Taillights
   var tl = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.15,0.05), new THREE.MeshBasicMaterial({color:0xff2233}));
   tl.position.set(0,0.55,-2.0); g.add(tl); g.userData.tail = tl;
+
   if (isCop) {
     var bar = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.2,0.35), new THREE.MeshStandardMaterial({color:0x111111}));
     bar.position.set(0,1.28,-0.2); g.add(bar);
     var red = new THREE.PointLight(0xff2233, 0, 20); red.position.set(-0.25,1.35,-0.2); g.add(red); g.userData.copRed=red;
     var blue = new THREE.PointLight(0x2255ff, 0, 20); blue.position.set(0.25,1.35,-0.2); g.add(blue); g.userData.copBlue=blue;
+  } else {
+    // Small rear spoiler — purely cosmetic, gives non-cop cars a sportier silhouette
+    var spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.06,0.3), trimMat);
+    spoiler.position.set(0,0.98,-1.85); g.add(spoiler);
+    var strutGeo = new THREE.BoxGeometry(0.06,0.22,0.06);
+    [-0.6,0.6].forEach(function(sx){
+      var strut = new THREE.Mesh(strutGeo, trimMat);
+      strut.position.set(sx,0.86,-1.85); g.add(strut);
+    });
   }
   return g;
 }
@@ -285,6 +348,7 @@ function Car(opts){
   this.waypoints = opts.waypoints || null;
   this.wpIndex = 0;
   this.hitFlash = 0;
+  this.stunTimer = 0; // brief post-crash window where throttle/brake input is ignored, so the bounce-back can separate the car from what it hit
   this.busted = 0; // cop-chase capture meter
 }
 Car.prototype.forwardVec = function(){ return new THREE.Vector3(Math.sin(this.heading),0,Math.cos(this.heading)); };
@@ -301,8 +365,9 @@ Car.prototype.updatePhysics = function(dt, input){
   var throttle = input.throttle, brake = input.brake, steer = input.steer, drift = input.drift, nitro = input.nitro;
 
   var speedFactor = Math.min(1, Math.abs(this.speed)/MAX_SPEED);
-  var turnRate = TURN_RATE * (1 - speedFactor*0.55) * (this.speed<0?-1:1);
-  if (Math.abs(this.speed) < 0.3) turnRate = 0; // no steering authority while stationary
+  var turnRate;
+  if (Math.abs(this.speed) < 2) turnRate = TURN_RATE * 0.5; // low-speed pivot, e.g. wheels turning near a stop
+  else turnRate = TURN_RATE * (1 - speedFactor*0.55) * (this.speed<0?-1:1);
   this.heading += steer * turnRate * dt * (drift?1.5:1);
 
   // spin from crash impulses decays
@@ -311,11 +376,14 @@ Car.prototype.updatePhysics = function(dt, input){
     this.angularVel *= Math.max(0, 1 - 2.2*dt);
   }
 
+  if (this.stunTimer>0) this.stunTimer -= dt;
+  var stunned = this.stunTimer>0;
+
   var maxFwd = nitro && this.nitroFuel>0 ? MAX_SPEED_NITRO : MAX_SPEED;
-  if (throttle>0){
+  if (throttle>0 && !stunned){
     this.speed += ACCEL*(nitro&&this.nitroFuel>0?1.7:1)*dt;
     this.speed = Math.min(this.speed, maxFwd);
-  } else if (brake>0){
+  } else if (brake>0 && !stunned){
     if (this.speed>0.5) this.speed -= BRAKE_DECEL*dt;
     else this.speed = Math.max(this.speed-ACCEL*0.6*dt, -REVERSE_MAX);
   } else {
@@ -380,14 +448,18 @@ function closestPointOnSeg(px,pz,s){
 }
 
 function resolveCrash(car, nx, nz, penetration, impactSpeed){
-  // push out
-  car.x += nx*penetration; car.z += nz*penetration;
+  // Always resolve interpenetration geometrically, even for merely-resting contact
+  // (no damage/bounce implied) — this alone must never be skipped or the car visibly clips.
+  car.x += nx*(penetration+0.12); car.z += nz*(penetration+0.12);
   var fwd = car.forwardVec();
   var vx = fwd.x*car.speed, vz = fwd.z*car.speed;
   var vn = vx*nx + vz*nz; // velocity component along normal (negative = into surface)
   var headOn = Math.abs(fwd.x*nx+fwd.z*nz); // 0 glancing .. 1 head-on
 
-  if (vn < 0){
+  // Require a real closing speed, not just trivial creep, to count as an actual crash —
+  // otherwise a car resting against a wall re-triggers "vn<0" every single frame forever
+  // (throttle re-applies a hair of inward speed each frame, satisfying vn<0 endlessly).
+  if (vn < -1.0){
     var restitution = 0.25;
     vx -= nx*vn*(1+restitution);
     vz -= nz*vn*(1+restitution);
@@ -402,10 +474,15 @@ function resolveCrash(car, nx, nz, penetration, impactSpeed){
     car.angularVel += (cross>=0?1:-1) * sev * (1.2 + (1-headOn)*3.5) * (0.6+Math.random()*0.6);
     burst(new THREE.Vector3(car.x + nx*car.radius, 0.6, car.z + nz*car.radius), 0xffaa33, 10+sev*16, 6+sev*10);
     if (car.isPlayer) shakeAmt = Math.max(shakeAmt, 0.15+sev*0.6);
+    if (car.isPlayer && window.__RL_DEBUG) console.log('[world-crash] pen='+penetration.toFixed(3)+' sev='+sev.toFixed(3)+' dmg='+dmg.toFixed(2)+' newSpeed='+car.speed.toFixed(2)+' pos=('+car.x.toFixed(2)+','+car.z.toFixed(2)+')');
+    // Brief control lockout on a real hit so the bounce-back can actually separate
+    // the car from what it hit, instead of the player re-flooring straight back into it.
+    car.stunTimer = Math.max(car.stunTimer, 0.15+sev*0.5);
   }
 }
 
-function collideCarWithWorld(car){
+function collideCarWithWorld(car, dt){
+  var hitThisFrame = false, avgNx = 0, avgNz = 0, hitCount = 0;
   for (var i=0;i<aabbColliders.length;i++){
     var b = aabbColliders[i];
     var cp = closestPointOnAABB(car.x,car.z,b);
@@ -416,6 +493,7 @@ function collideCarWithWorld(car){
       var pen = car.radius-dist;
       var speedAtHit = car.speed;
       resolveCrash(car, nx, nz, pen, speedAtHit);
+      hitThisFrame = true; avgNx += nx; avgNz += nz; hitCount++;
     }
   }
   for (var i=0;i<segColliders.length;i++){
@@ -427,6 +505,7 @@ function collideCarWithWorld(car){
       var nx,nz;
       if (dist>0.0001){ nx=dx/dist; nz=dz/dist; } else { nx=1; nz=0; }
       resolveCrash(car, nx, nz, minD-dist, car.speed);
+      hitThisFrame = true; avgNx += nx; avgNz += nz; hitCount++;
     }
   }
   // world boundary
@@ -434,6 +513,28 @@ function collideCarWithWorld(car){
   if (d > WORLD_R-20){
     var nx=-car.x/d, nz=-car.z/d;
     resolveCrash(car, nx, nz, d-(WORLD_R-20), car.speed);
+    hitThisFrame = true; avgNx += nx; avgNz += nz; hitCount++;
+  }
+
+  // Safety net: whatever the exact geometric cause (e.g. a car caught between two
+  // adjacent guardrail segments around a curve, each shove undoing the other's), a
+  // car should never be able to grind in roughly the same spot indefinitely. Track
+  // real elapsed time + actual displacement (not a per-frame streak, which a subtle
+  // hit/no-hit alternation between adjacent colliders could reset before it fires)
+  // and force a decisive separation once it's clear the car isn't making progress.
+  if (car._stuckCheckX==null){ car._stuckCheckX=car.x; car._stuckCheckZ=car.z; car._stuckCheckT=0; car._stuckDamaged=false; }
+  car._stuckCheckT += dt||0;
+  if (hitThisFrame) car._stuckDamaged = true;
+  if (car._stuckCheckT > 0.8){
+    var moved = Math.hypot(car.x-car._stuckCheckX, car.z-car._stuckCheckZ);
+    if (moved < 2.0 && car._stuckDamaged){
+      var mnx = hitCount>0 ? avgNx/hitCount : (car.x-car._stuckCheckX)||1;
+      var mnz = hitCount>0 ? avgNz/hitCount : (car.z-car._stuckCheckZ)||0;
+      var mlen = Math.hypot(mnx,mnz) || 1;
+      car.x += (mnx/mlen)*4.0; car.z += (mnz/mlen)*4.0;
+      car.speed = 0; car.driftSlip = 0; car.angularVel = 0; car.stunTimer = Math.max(car.stunTimer, 0.5);
+    }
+    car._stuckCheckX = car.x; car._stuckCheckZ = car.z; car._stuckCheckT = 0; car._stuckDamaged = false;
   }
 }
 
@@ -442,18 +543,31 @@ function collideCarCar(a,b){
   var minD = a.radius+b.radius;
   if (dist < minD && dist>0.001){
     var nx=dx/dist, nz=dz/dist;
-    var pen=(minD-dist)/2;
-    a.x += nx*pen; a.z += nz*pen;
-    b.x -= nx*pen; b.z -= nz*pen;
-    var relSpeed = Math.abs(a.speed)+Math.abs(b.speed);
-    var sev = Math.min(1, relSpeed/ (MAX_SPEED*1.4));
-    a.applyDamage(sev*sev*30);
-    b.applyDamage(sev*sev*30);
-    a.angularVel += sev*2.2*(Math.random()<0.5?1:-1);
-    b.angularVel += sev*2.2*(Math.random()<0.5?1:-1);
-    a.speed *= 0.5; b.speed *= 0.5;
-    burst(new THREE.Vector3((a.x+b.x)/2,0.6,(a.z+b.z)/2), 0xffcc55, 16, 9);
-    if (a.isPlayer||b.isPlayer) shakeAmt = Math.max(shakeAmt, 0.3+sev*0.5);
+    // push fully apart (plus a small margin) rather than splitting the gap in half —
+    // halving it left cars sitting just inside minD, re-triggering next frame forever
+    var sep = (minD-dist)+0.08;
+    a.x += nx*sep*0.5; a.z += nz*sep*0.5;
+    b.x -= nx*sep*0.5; b.z -= nz*sep*0.5;
+
+    // Only a real hit if the cars are actually closing on each other, not just resting
+    // in contact — otherwise two stopped/grazing cars would grind damage forever.
+    var relVx = (a.forwardVec().x*a.speed) - (b.forwardVec().x*b.speed);
+    var relVz = (a.forwardVec().z*a.speed) - (b.forwardVec().z*b.speed);
+    var closingSpeed = -(relVx*nx + relVz*nz); // positive = closing
+    if (closingSpeed > 1.5){
+      var sev = Math.min(1, closingSpeed/(MAX_SPEED*1.4));
+      a.applyDamage(sev*sev*30);
+      b.applyDamage(sev*sev*30);
+      a.angularVel += sev*2.2*(Math.random()<0.5?1:-1);
+      b.angularVel += sev*2.2*(Math.random()<0.5?1:-1);
+      a.speed *= 0.5; b.speed *= 0.5;
+      burst(new THREE.Vector3((a.x+b.x)/2,0.6,(a.z+b.z)/2), 0xffcc55, 16, 9);
+      if (a.isPlayer||b.isPlayer) shakeAmt = Math.max(shakeAmt, 0.3+sev*0.5);
+      if ((a.isPlayer||b.isPlayer) && window.__RL_DEBUG) console.log('[car-crash] closingSpeed='+closingSpeed.toFixed(2)+' sev='+sev.toFixed(3)+' dist='+dist.toFixed(3)+' minD='+minD.toFixed(2));
+      var stun = 0.15+sev*0.5;
+      a.stunTimer = Math.max(a.stunTimer, stun);
+      b.stunTimer = Math.max(b.stunTimer, stun);
+    }
   }
 }
 
@@ -531,7 +645,7 @@ function updateTraffic(dt){
     var d = Math.hypot(wp.x-c.x, wp.z-c.z);
     if (d<8) c.wpIndex = (c.wpIndex+1)%c.waypoints.length;
     aiSteerToward(c, wp.x, wp.z, dt, false);
-    collideCarWithWorld(c);
+    collideCarWithWorld(c, dt);
   });
 }
 function updateRacers(dt){
@@ -540,13 +654,13 @@ function updateRacers(dt){
     var d = Math.hypot(cp.x-c.x, cp.z-c.z);
     if (d<14){ c.nextCP=(c.nextCP+1)%checkpoints.length; if (c.nextCP===0) c.lap++; }
     aiSteerToward(c, cp.x, cp.z, dt, true);
-    collideCarWithWorld(c);
+    collideCarWithWorld(c, dt);
   });
 }
 function updateCops(dt){
   cops.forEach(function(c){
     aiSteerToward(c, player.x, player.z, dt, true);
-    collideCarWithWorld(c);
+    collideCarWithWorld(c, dt);
     var d = Math.hypot(player.x-c.x, player.z-c.z);
     if (d < 6){
       bustMeter += dt*38;
@@ -785,8 +899,9 @@ function animate(){
     if (input.nitro && player.nitroFuel>0) player.nitroFuel = Math.max(0,player.nitroFuel-40*dt);
     else player.nitroFuel = Math.min(100, player.nitroFuel+12*dt);
     player.updatePhysics(dt, input);
-    collideCarWithWorld(player);
+    collideCarWithWorld(player, dt);
     traffic.forEach(function(t){ collideCarCar(player,t); });
+    emitSmoke(player);
 
     updateTraffic(dt);
     if (mode==='circuit'){
