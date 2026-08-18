@@ -215,6 +215,36 @@ function updateParticles(dt){
     if (p.life<=0){ scene.remove(p.mesh); p.mesh.material.dispose(); particles.splice(i,1); }
   }
 }
+// ── Soft-body-style crumple: push body-mesh vertices near the impact point
+// inward along the hit normal, clamped so they can't collapse past a limit.
+var _dfM4 = new THREE.Matrix4(), _dfLocalPt = new THREE.Vector3(), _dfLocalN = new THREE.Vector3();
+function deformCarBody(car, worldPt, worldNx, worldNz, severity){
+  var body = car.mesh.userData.body;
+  car.mesh.updateMatrixWorld(true);
+  _dfLocalPt.copy(worldPt);
+  body.worldToLocal(_dfLocalPt);
+  _dfM4.extractRotation(body.matrixWorld).invert();
+  _dfLocalN.set(worldNx,0,worldNz).applyMatrix4(_dfM4).normalize();
+
+  var geo = body.geometry, pos = geo.attributes.position, orig = geo.userData.origPos;
+  var radius = 0.9 + severity*0.6, push = 0.12 + severity*0.32, maxDent = 0.42;
+  for (var i=0;i<pos.count;i++){
+    var ox=orig[i*3], oy=orig[i*3+1], oz=orig[i*3+2];
+    var dx=ox-_dfLocalPt.x, dy=oy-_dfLocalPt.y, dz=oz-_dfLocalPt.z;
+    var d = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    if (d>radius) continue;
+    var falloff = 1 - d/radius;
+    var cx=pos.getX(i), cy=pos.getY(i), cz=pos.getZ(i);
+    var nx=cx-_dfLocalN.x*push*falloff, ny=cy-_dfLocalN.y*push*falloff, nz=cz-_dfLocalN.z*push*falloff;
+    // clamp displacement from the pristine vertex so it can't invert through itself
+    var ddx=nx-ox, ddy=ny-oy, ddz=nz-oz, dd=Math.sqrt(ddx*ddx+ddy*ddy+ddz*ddz);
+    if (dd>maxDent){ var s=maxDent/dd; nx=ox+ddx*s; ny=oy+ddy*s; nz=oz+ddz*s; }
+    pos.setXYZ(i, nx, ny, nz);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+}
+
 var smokeCooldownByCarId = new WeakMap();
 function emitSmoke(car){
   var dmg = car.damage;
@@ -255,7 +285,9 @@ function buildCarMesh(bodyColor, isCop){
 
   // Lower body — slightly tapered silhouette (wider at the doors than the nose/tail) for a
   // less box-of-a-car look, built from a stack of boxes rather than one flat slab.
-  var body = new THREE.Mesh(new THREE.BoxGeometry(1.9,0.5,4.0), bodyMat);
+  var bodyGeo = new THREE.BoxGeometry(1.9,0.5,4.0, 5,3,10); // segmented so it can dent
+  bodyGeo.userData.origPos = bodyGeo.attributes.position.array.slice();
+  var body = new THREE.Mesh(bodyGeo, bodyMat);
   body.position.y = 0.5; g.add(body); g.userData.body = body;
   var beltline = new THREE.Mesh(new THREE.BoxGeometry(1.96,0.16,3.2), bodyMat);
   beltline.position.set(0,0.78,0); g.add(beltline);
@@ -473,6 +505,7 @@ function resolveCrash(car, nx, nz, penetration, impactSpeed){
     var cross = fwd.x*nz - fwd.z*nx;
     car.angularVel += (cross>=0?1:-1) * sev * (1.2 + (1-headOn)*3.5) * (0.6+Math.random()*0.6);
     burst(new THREE.Vector3(car.x + nx*car.radius, 0.6, car.z + nz*car.radius), 0xffaa33, 10+sev*16, 6+sev*10);
+    if (sev>0.05) deformCarBody(car, new THREE.Vector3(car.x + nx*car.radius, 0.55, car.z + nz*car.radius), nx, nz, sev);
     if (car.isPlayer) shakeAmt = Math.max(shakeAmt, 0.15+sev*0.6);
     if (car.isPlayer && window.__RL_DEBUG) console.log('[world-crash] pen='+penetration.toFixed(3)+' sev='+sev.toFixed(3)+' dmg='+dmg.toFixed(2)+' newSpeed='+car.speed.toFixed(2)+' pos=('+car.x.toFixed(2)+','+car.z.toFixed(2)+')');
     // Brief control lockout on a real hit so the bounce-back can actually separate
@@ -562,6 +595,9 @@ function collideCarCar(a,b){
       b.angularVel += sev*2.2*(Math.random()<0.5?1:-1);
       a.speed *= 0.5; b.speed *= 0.5;
       burst(new THREE.Vector3((a.x+b.x)/2,0.6,(a.z+b.z)/2), 0xffcc55, 16, 9);
+      var midPt = new THREE.Vector3((a.x+b.x)/2, 0.55, (a.z+b.z)/2);
+      deformCarBody(a, midPt, nx, nz, sev);
+      deformCarBody(b, midPt, -nx, -nz, sev);
       if (a.isPlayer||b.isPlayer) shakeAmt = Math.max(shakeAmt, 0.3+sev*0.5);
       if ((a.isPlayer||b.isPlayer) && window.__RL_DEBUG) console.log('[car-crash] closingSpeed='+closingSpeed.toFixed(2)+' sev='+sev.toFixed(3)+' dist='+dist.toFixed(3)+' minD='+minD.toFixed(2));
       var stun = 0.15+sev*0.5;
