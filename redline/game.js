@@ -370,6 +370,29 @@ function buildCarMesh(bodyColor, isCop){
   return g;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  CAR TIERS / ECONOMY — Garage cars, purchased with money earned from
+//  circuit-race wins and cop-chase survivals.
+// ══════════════════════════════════════════════════════════════════════════
+var CAR_TIERS = [
+  { id:'starter', name:'STARTER',      cost:0,    color:0xff2233, speedMul:1.00, accelMul:1.00, turnMul:1.00, nitroMul:1.00 },
+  { id:'sport',   name:'SPORT COUPE',  cost:900,  color:0x00e5ff, speedMul:1.15, accelMul:1.15, turnMul:1.05, nitroMul:1.10 },
+  { id:'muscle',  name:'MUSCLE V8',    cost:1800, color:0xff8800, speedMul:1.28, accelMul:1.32, turnMul:0.95, nitroMul:1.15 },
+  { id:'super',   name:'HYPERCAR',     cost:3200, color:0xe8e8f0, speedMul:1.45, accelMul:1.45, turnMul:1.18, nitroMul:1.35 }
+];
+function tierById(id){ for (var i=0;i<CAR_TIERS.length;i++) if (CAR_TIERS[i].id===id) return CAR_TIERS[i]; return CAR_TIERS[0]; }
+
+function loadMoney(){ var v = parseInt(localStorage.getItem('redline_money'),10); return isNaN(v) ? 500 : v; }
+function saveMoney(v){ try { localStorage.setItem('redline_money', String(v)); } catch(e){} }
+function loadGarage(){
+  try {
+    var g = JSON.parse(localStorage.getItem('redline_garage'));
+    if (g && g.owned && g.owned.length) return g;
+  } catch(e){}
+  return { owned:['starter'], selected:'starter' };
+}
+function saveGarage(g){ try { localStorage.setItem('redline_garage', JSON.stringify(g)); } catch(e){} }
+
 function Car(opts){
   this.mesh = buildCarMesh(opts.color, opts.isCop);
   scene.add(this.mesh);
@@ -390,6 +413,14 @@ function Car(opts){
   this.hitFlash = 0;
   this.stunTimer = 0; // brief post-crash window where throttle/brake input is ignored, so the bounce-back can separate the car from what it hit
   this.busted = 0; // cop-chase capture meter
+  // Per-car performance stats — default to the base tier, overridden for the player's
+  // selected garage car so different cars actually feel different to drive.
+  var tier = opts.tier || CAR_TIERS[0];
+  this.maxSpeed = MAX_SPEED * tier.speedMul;
+  this.maxSpeedNitro = MAX_SPEED_NITRO * tier.speedMul;
+  this.accel = ACCEL * tier.accelMul;
+  this.turnRate = TURN_RATE * tier.turnMul;
+  this.nitroDrainMul = 1 / tier.nitroMul; // better nitro tier = slower drain
 }
 Car.prototype.forwardVec = function(){ return new THREE.Vector3(-Math.sin(this.heading),0,Math.cos(this.heading)); };
 
@@ -404,10 +435,10 @@ Car.prototype.updatePhysics = function(dt, input){
   }
   var throttle = input.throttle, brake = input.brake, steer = input.steer, drift = input.drift, nitro = input.nitro;
 
-  var speedFactor = Math.min(1, Math.abs(this.speed)/MAX_SPEED);
+  var speedFactor = Math.min(1, Math.abs(this.speed)/this.maxSpeed);
   var turnRate;
-  if (Math.abs(this.speed) < 2) turnRate = TURN_RATE * 0.5; // low-speed pivot, e.g. wheels turning near a stop
-  else turnRate = TURN_RATE * (1 - speedFactor*0.55) * (this.speed<0?-1:1);
+  if (Math.abs(this.speed) < 2) turnRate = this.turnRate * 0.5; // low-speed pivot, e.g. wheels turning near a stop
+  else turnRate = this.turnRate * (1 - speedFactor*0.55) * (this.speed<0?-1:1);
   this.heading += steer * turnRate * dt * (drift?1.5:1);
 
   // spin from crash impulses decays
@@ -419,13 +450,13 @@ Car.prototype.updatePhysics = function(dt, input){
   if (this.stunTimer>0) this.stunTimer -= dt;
   var stunned = this.stunTimer>0;
 
-  var maxFwd = nitro && this.nitroFuel>0 ? MAX_SPEED_NITRO : MAX_SPEED;
+  var maxFwd = nitro && this.nitroFuel>0 ? this.maxSpeedNitro : this.maxSpeed;
   if (throttle>0 && !stunned){
-    this.speed += ACCEL*(nitro&&this.nitroFuel>0?1.7:1)*dt;
+    this.speed += this.accel*(nitro&&this.nitroFuel>0?1.7:1)*dt;
     this.speed = Math.min(this.speed, maxFwd);
   } else if (brake>0 && !stunned){
     if (this.speed>0.5) this.speed -= BRAKE_DECEL*dt;
-    else this.speed = Math.max(this.speed-ACCEL*0.6*dt, -REVERSE_MAX);
+    else this.speed = Math.max(this.speed-this.accel*0.6*dt, -REVERSE_MAX);
   } else {
     if (this.speed>0) this.speed = Math.max(0, this.speed-DRAG*dt);
     else if (this.speed<0) this.speed = Math.min(0, this.speed+DRAG*dt);
@@ -618,12 +649,18 @@ function collideCarCar(a,b){
 //  GAME STATE
 // ══════════════════════════════════════════════════════════════════════════
 var gameState = 'menu'; // menu|playing|paused|results|busted
-var mode = 'freeroam';  // freeroam|circuit|copchase
+// mode = which activity is currently active INSIDE the one persistent world.
+// 'free' is the default state the player is in most of the time; driving through
+// the race gate or into the chase zone below switches to 'circuit'/'copchase'
+// without leaving the world, and finishing returns to 'free' in the same session.
+var mode = 'free';
 var player, traffic=[], cops=[], racers=[];
 var camMode = 'chase';
 var shakeAmt = 0;
 var raceTime=0, raceLaps=3, checkpoints=[], copTimer=0, bustMeter=0;
 var startPos = new THREE.Vector3(0, 0, downtownHalf+STREET_W*0.5+30);
+var playerMoney = loadMoney();
+var garage = loadGarage();
 
 // checkpoints: loop using highway points subsampled + a downtown leg
 function buildCheckpoints(){
@@ -631,6 +668,30 @@ function buildCheckpoints(){
   for (var i=0;i<HW_SEG;i+=6) checkpoints.push({x:highwayPts[i].x, z:highwayPts[i].z});
 }
 buildCheckpoints();
+
+// ── World triggers: driving into these (while mode==='free') starts that activity ──
+var RACE_GATE = { x: checkpoints[0].x, z: checkpoints[0].z, r: 16 };
+var CHASE_ZONE = { x: downtownHalf*0.55, z: -downtownHalf*0.55, r: 20 };
+var gateRing, chaseRing;
+(function buildTriggerMarkers(){
+  var gateGeo = new THREE.TorusGeometry(RACE_GATE.r*0.7, 0.6, 8, 24);
+  gateRing = new THREE.Mesh(gateGeo, new THREE.MeshBasicMaterial({ color:0xffcc00, transparent:true, opacity:0.75 }));
+  gateRing.position.set(RACE_GATE.x, 4, RACE_GATE.z);
+  gateRing.rotation.x = Math.PI/2;
+  scene.add(gateRing);
+  var gateLight = new THREE.PointLight(0xffcc00, 2, 40); gateLight.position.set(RACE_GATE.x, 3, RACE_GATE.z); scene.add(gateLight);
+
+  var chaseGeo = new THREE.RingGeometry(CHASE_ZONE.r*0.85, CHASE_ZONE.r, 32);
+  chaseRing = new THREE.Mesh(chaseGeo, new THREE.MeshBasicMaterial({ color:0xff2233, transparent:true, opacity:0.5, side:THREE.DoubleSide }));
+  chaseRing.position.set(CHASE_ZONE.x, 0.08, CHASE_ZONE.z);
+  chaseRing.rotation.x = -Math.PI/2;
+  scene.add(chaseRing);
+  var chaseLight = new THREE.PointLight(0xff2233, 1.6, 45); chaseLight.position.set(CHASE_ZONE.x, 3, CHASE_ZONE.z); scene.add(chaseLight);
+})();
+function updateTriggerMarkers(t){
+  if (gateRing) gateRing.rotation.z = t*0.6;
+  if (chaseRing) chaseRing.material.opacity = 0.35 + Math.sin(t*3)*0.15;
+}
 
 function trafficWaypoints(){
   // simple rectangular loop through downtown streets
@@ -713,6 +774,7 @@ function updateCops(dt){
     }
   });
   if (bustMeter>=100 && gameState==='playing') doBusted();
+  else if (raceTime>=CHASE_SURVIVE_TO_WIN && gameState==='playing') doChaseWon();
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -797,15 +859,11 @@ function readInput(){
 // ══════════════════════════════════════════════════════════════════════════
 var homeScreen=document.getElementById('home-screen'), pauseScreen=document.getElementById('pause-screen');
 var resultsScreen=document.getElementById('results-screen'), bustedScreen=document.getElementById('busted-screen');
+var garageScreen=document.getElementById('garage-screen');
 var hud=document.getElementById('hud'), pauseBtnHud=document.getElementById('pause-btn-hud');
 var bustedFlash=document.getElementById('busted-flash');
-var modeDesc=document.getElementById('mode-desc'), bestDisplay=document.getElementById('best-display');
-
-var MODE_DESCS = {
-  freeroam: 'Free Roam: explore the open city, no fail state. Crash, drift, and boost freely.',
-  circuit: 'Circuit Race: 3 laps against 3 rivals through downtown and the highway loop. First past the line wins.',
-  copchase: 'Cop Chase: outrun the police. Getting rammed while boxed in fills the bust meter — survive as long as you can.'
-};
+var bestDisplay=document.getElementById('best-display');
+var triggerToast=document.getElementById('trigger-toast'), rewardToast=document.getElementById('reward-toast');
 
 function loadBest(){
   try { return JSON.parse(localStorage.getItem('redline_best')) || {}; } catch(e){ return {}; }
@@ -826,34 +884,147 @@ function fmtTime(s){
 }
 refreshBestDisplay();
 
-['freeroam','circuit','copchase'].forEach(function(m){
-  document.getElementById('btn-'+m).addEventListener('mouseenter', function(){ modeDesc.textContent = MODE_DESCS[m]; });
+function refreshMoneyDisplays(){
+  var txt = '$'+playerMoney.toLocaleString();
+  document.getElementById('home-money').textContent = txt;
+  document.getElementById('garage-money').textContent = txt;
+}
+refreshMoneyDisplays();
+
+function awardMoney(amount, label){
+  playerMoney += amount; saveMoney(playerMoney);
+  refreshMoneyDisplays();
+  rewardToast.textContent = '+$'+amount.toLocaleString()+(label?' — '+label:'');
+  rewardToast.classList.add('show');
+  setTimeout(function(){ rewardToast.classList.remove('show'); }, 2200);
+}
+
+// ── Garage ───────────────────────────────────────────────────────────────
+function renderGarage(){
+  refreshMoneyDisplays();
+  var grid = document.getElementById('garage-grid');
+  grid.innerHTML = '';
+  CAR_TIERS.forEach(function(t){
+    var owned = garage.owned.indexOf(t.id)>=0;
+    var selected = garage.selected===t.id;
+    var card = document.createElement('div');
+    card.className = 'gcard'+(selected?' selected':'');
+    var statsHtml = 'SPEED '+Math.round(t.speedMul*100)+'%&nbsp;&nbsp;ACCEL '+Math.round(t.accelMul*100)+'%<br>HANDLING '+Math.round(t.turnMul*100)+'%&nbsp;&nbsp;NITRO '+Math.round(t.nitroMul*100)+'%';
+    var btnHtml = selected
+      ? '<button class="gcard-btn active" disabled>Equipped</button>'
+      : owned
+        ? '<button class="gcard-btn own" data-select="'+t.id+'">Select</button>'
+        : '<button class="gcard-btn buy" data-buy="'+t.id+'" '+(playerMoney<t.cost?'disabled':'')+'>Buy — $'+t.cost.toLocaleString()+'</button>';
+    card.innerHTML =
+      '<div class="gcard-swatch" style="background:#'+t.color.toString(16).padStart(6,'0')+';box-shadow:0 0 18px #'+t.color.toString(16).padStart(6,'0')+'55;"></div>'+
+      '<div class="gcard-name">'+t.name+'</div>'+
+      '<div class="gcard-stats">'+statsHtml+'</div>'+
+      btnHtml;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('[data-buy]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var t = tierById(btn.dataset.buy);
+      if (playerMoney < t.cost) return;
+      playerMoney -= t.cost; saveMoney(playerMoney);
+      garage.owned.push(t.id); garage.selected = t.id; saveGarage(garage);
+      if (player) reskinPlayerCar();
+      renderGarage();
+    });
+  });
+  grid.querySelectorAll('[data-select]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      garage.selected = btn.dataset.select; saveGarage(garage);
+      if (player) reskinPlayerCar();
+      renderGarage();
+    });
+  });
+}
+function reskinPlayerCar(){
+  var t = tierById(garage.selected);
+  player.maxSpeed = MAX_SPEED*t.speedMul; player.maxSpeedNitro = MAX_SPEED_NITRO*t.speedMul;
+  player.accel = ACCEL*t.accelMul; player.turnRate = TURN_RATE*t.turnMul; player.nitroDrainMul = 1/t.nitroMul;
+  player.mesh.userData.body.material.color.setHex(t.color);
+}
+
+var garageReturnTo = 'home'; // 'home' or 'pause' — where btn-garage-back sends you
+document.getElementById('btn-garage').addEventListener('click', function(){ garageReturnTo='home'; renderGarage(); showScreen('garage'); });
+document.getElementById('btn-garage-pause').addEventListener('click', function(){ garageReturnTo='pause'; renderGarage(); pauseScreen.style.display='none'; showScreen('garage'); });
+document.getElementById('btn-garage-back').addEventListener('click', function(){
+  showScreen(garageReturnTo==='pause' ? null : 'home');
+  if (garageReturnTo==='pause') pauseScreen.style.display='flex';
 });
-document.getElementById('btn-freeroam').addEventListener('click', function(){ startGame('freeroam'); });
-document.getElementById('btn-circuit').addEventListener('click', function(){ startGame('circuit'); });
-document.getElementById('btn-copchase').addEventListener('click', function(){ startGame('copchase'); });
+
+function showScreen(which){
+  homeScreen.style.display = which==='home' ? 'flex' : 'none';
+  garageScreen.style.display = which==='garage' ? 'flex' : 'none';
+}
+
+document.getElementById('btn-freeroam').addEventListener('click', enterCity);
 document.getElementById('btn-resume').addEventListener('click', resumeGame);
 document.getElementById('btn-quit').addEventListener('click', goHome);
 document.getElementById('btn-results-menu').addEventListener('click', goHome);
 document.getElementById('btn-busted-menu').addEventListener('click', goHome);
+document.getElementById('btn-results-continue').addEventListener('click', function(){ backToFreeRoam(); });
+document.getElementById('btn-busted-continue').addEventListener('click', function(){ backToFreeRoam(); });
 pauseBtnHud.addEventListener('click', function(){ if (gameState==='playing') pauseGame(); });
 pauseBtnHud.style.display = hasTouchScreen ? 'none' : 'block';
 
-function startGame(m){
-  mode = m;
+function enterCity(){
+  mode = 'free';
   resetWorldEntities();
-  player = new Car({ x:startPos.x, z:startPos.z, heading:Math.PI, color:0xff2233, isPlayer:true });
-  spawnTraffic(mode==='freeroam'?7:4);
+  player = new Car({ x:startPos.x, z:startPos.z, heading:Math.PI, isPlayer:true, tier:tierById(garage.selected) });
+  reskinPlayerCar();
+  spawnTraffic(8);
   raceTime = 0; bustMeter = 0;
-  if (mode==='circuit'){ spawnRacers(3); player.lap=0; player.nextCP=0; raceLaps=3; }
-  if (mode==='copchase'){ spawnCops(3); copTimer=0; }
   gameState='playing';
-  homeScreen.style.display='none'; hud.style.display='block';
+  showScreen(null); hud.style.display='block';
+  setHudForMode();
+  pauseBtnHud.style.display = hasTouchScreen ? 'none' : 'block';
+}
+function backToFreeRoam(){
+  // Return to free-roam in the SAME session — the world, player position, and
+  // damage all persist, only the race/chase actors and their HUD panels clear.
+  racers.forEach(function(c){ scene.remove(c.mesh); }); racers=[];
+  cops.forEach(function(c){ scene.remove(c.mesh); }); cops=[];
+  mode = 'free'; bustMeter = 0;
+  gameState = 'playing';
+  resultsScreen.style.display='none'; bustedScreen.style.display='none';
+  hud.style.display='block';
+  setHudForMode();
+}
+function setHudForMode(){
   document.getElementById('lap-panel').style.display = mode==='circuit'?'block':'none';
   document.getElementById('pos-panel').style.display = mode==='circuit'?'block':'none';
   document.getElementById('timer-panel').style.display = (mode==='circuit'||mode==='copchase')?'block':'none';
-  document.getElementById('cam-hint').textContent = mode==='circuit' ? 'follow the compass to the next checkpoint' : (mode==='copchase' ? 'lose the cops — avoid getting boxed in' : '');
-  pauseBtnHud.style.display = hasTouchScreen ? 'none' : 'block';
+  document.getElementById('cam-hint').textContent = mode==='circuit' ? 'follow the compass to the next checkpoint' : (mode==='copchase' ? 'lose the cops — avoid getting boxed in' : 'yellow gate = race · red zone = cop chase');
+}
+function showTrigger(text, color){
+  triggerToast.textContent = text;
+  triggerToast.style.color = color; triggerToast.style.textShadow = '0 0 20px '+color;
+  triggerToast.classList.add('show');
+  setTimeout(function(){ triggerToast.classList.remove('show'); }, 1600);
+}
+function startCircuitRace(){
+  mode = 'circuit';
+  spawnRacers(3);
+  player.lap=0; player.nextCP=0; raceLaps=3; raceTime=0;
+  setHudForMode();
+  showTrigger('CIRCUIT RACE — GO!', '#ffcc00');
+}
+function startCopChase(){
+  mode = 'copchase';
+  spawnCops(3);
+  bustMeter=0; raceTime=0;
+  setHudForMode();
+  showTrigger('COPS! GO GO GO', '#ff3355');
+}
+function checkWorldTriggers(){
+  if (mode!=='free') return;
+  var dg = Math.hypot(player.x-RACE_GATE.x, player.z-RACE_GATE.z);
+  if (dg < RACE_GATE.r) { startCircuitRace(); return; }
+  var dc = Math.hypot(player.x-CHASE_ZONE.x, player.z-CHASE_ZONE.z);
+  if (dc < CHASE_ZONE.r) { startCopChase(); return; }
 }
 function pauseGame(){ if (gameState!=='playing') return; gameState='paused'; pauseScreen.style.display='flex'; }
 function resumeGame(){ if (gameState!=='paused') return; gameState='playing'; pauseScreen.style.display='none'; }
@@ -863,15 +1034,36 @@ function goHome(){
   resultsScreen.style.display='none'; bustedScreen.style.display='none'; pauseBtnHud.style.display='none';
   refreshBestDisplay();
 }
+var RACE_PAYOUT = [700, 350, 150, 0]; // by place (1st..4th)
+var CHASE_SURVIVE_TO_WIN = 45; // seconds of survival to escape the cops
+var CHASE_WIN_PAYOUT = 550, CHASE_WIN_BONUS_PER_SEC = 6;
+
 function doFinishRace(place){
   gameState='results';
   hud.style.display='none';
+  var payout = RACE_PAYOUT[Math.min(place,4)-1] || 0;
   document.getElementById('results-title').textContent = place===1 ? 'YOU WIN' : place+(place===2?'nd':place===3?'rd':'th')+' PLACE';
   document.getElementById('results-stats').innerHTML =
     '<div class="stat-row">TIME <span>'+fmtTime(raceTime)+'</span></div>' +
-    '<div class="stat-row">FINISH <span>'+place+' / 4</span></div>';
+    '<div class="stat-row">FINISH <span>'+place+' / 4</span></div>' +
+    (payout>0 ? '<div class="stat-row">PAYOUT <span style="color:#4ade80;">+$'+payout.toLocaleString()+'</span></div>' : '');
   var best = loadBest();
   if (place===1 && (!best.circuit || raceTime<best.circuit)){ best.circuit=raceTime; saveBest(best); }
+  if (payout>0) awardMoney(payout, place===1?'RACE WON':'RACE FINISHED');
+  resultsScreen.style.display='flex';
+}
+function doChaseWon(){
+  gameState='results';
+  hud.style.display='none';
+  cops.forEach(function(c){ scene.remove(c.mesh); }); cops=[];
+  var payout = CHASE_WIN_PAYOUT + Math.round(raceTime*CHASE_WIN_BONUS_PER_SEC);
+  document.getElementById('results-title').textContent = 'COPS LOST YOU';
+  document.getElementById('results-stats').innerHTML =
+    '<div class="stat-row">EVADED FOR <span>'+fmtTime(raceTime)+'</span></div>' +
+    '<div class="stat-row">PAYOUT <span style="color:#4ade80;">+$'+payout.toLocaleString()+'</span></div>';
+  var best = loadBest();
+  if (!best.copchase || raceTime>best.copchase){ best.copchase=raceTime; saveBest(best); }
+  awardMoney(payout, 'EVADED THE COPS');
   resultsScreen.style.display='flex';
 }
 function doBusted(){
@@ -939,7 +1131,7 @@ function animate(){
     raceTime += dt;
     var input = readInput();
     player.nitroFuel = player.nitroFuel==null?100:player.nitroFuel;
-    if (input.nitro && player.nitroFuel>0) player.nitroFuel = Math.max(0,player.nitroFuel-40*dt);
+    if (input.nitro && player.nitroFuel>0) player.nitroFuel = Math.max(0,player.nitroFuel-40*player.nitroDrainMul*dt);
     else player.nitroFuel = Math.min(100, player.nitroFuel+12*dt);
     player.updatePhysics(dt, input);
     collideCarWithWorld(player, dt);
@@ -975,9 +1167,11 @@ function animate(){
       cops.forEach(function(c){ var d=Math.hypot(c.x-player.x,c.z-player.z); if (d<nd){nd=d;nearest=c;} });
       if (nearest) drawCompass(Math.atan2(nearest.x-player.x, nearest.z-player.z) - player.heading);
     } else {
+      checkWorldTriggers();
       drawCompass(null);
     }
 
+    updateTriggerMarkers(raceTime);
     updateParticles(dt);
     drawMinimap();
     drawSpeedo(Math.abs(player.speed)*2.1);
