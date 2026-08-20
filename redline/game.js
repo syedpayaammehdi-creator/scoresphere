@@ -227,15 +227,23 @@ function deformCarBody(car, worldPt, worldNx, worldNz, severity){
   _dfLocalN.set(worldNx,0,worldNz).applyMatrix4(_dfM4).normalize();
 
   var geo = body.geometry, pos = geo.attributes.position, orig = geo.userData.origPos;
-  var radius = 0.9 + severity*0.6, push = 0.12 + severity*0.32, maxDent = 0.42;
+  // BeamNG-style crumple magnitudes: a hard hit should visibly cave the nose/side in,
+  // not just dimple it. radius/push/maxDent are all deliberately large relative to the
+  // ~1.9 x 0.55 x 4.6 body so a serious impact reads immediately as real damage.
+  var radius = 0.75 + severity*0.75, push = 0.5 + severity*0.95, maxDent = 0.55;
   for (var i=0;i<pos.count;i++){
     var ox=orig[i*3], oy=orig[i*3+1], oz=orig[i*3+2];
     var dx=ox-_dfLocalPt.x, dy=oy-_dfLocalPt.y, dz=oz-_dfLocalPt.z;
     var d = Math.sqrt(dx*dx+dy*dy+dz*dz);
     if (d>radius) continue;
-    var falloff = 1 - d/radius;
+    var t = 1 - d/radius;
+    var falloff = t*t*(3-2*t); // smoothstep — rounded crumple instead of a sharp cone
+    // worldNx/worldNz point from the obstacle toward the car, so pushing ALONG that
+    // direction moves surface vertices further into the car's own body — that's the dent.
+    // (Subtracting here, as an earlier version did, pushed vertices back toward the
+    // obstacle instead — the surface would bulge outward rather than cave in.)
     var cx=pos.getX(i), cy=pos.getY(i), cz=pos.getZ(i);
-    var nx=cx-_dfLocalN.x*push*falloff, ny=cy-_dfLocalN.y*push*falloff, nz=cz-_dfLocalN.z*push*falloff;
+    var nx=cx+_dfLocalN.x*push*falloff, ny=cy+_dfLocalN.y*push*falloff*0.6, nz=cz+_dfLocalN.z*push*falloff;
     // clamp displacement from the pristine vertex so it can't invert through itself
     var ddx=nx-ox, ddy=ny-oy, ddz=nz-oz, dd=Math.sqrt(ddx*ddx+ddy*ddy+ddz*ddz);
     if (dd>maxDent){ var s=maxDent/dd; nx=ox+ddx*s; ny=oy+ddy*s; nz=oz+ddz*s; }
@@ -283,12 +291,13 @@ function buildCarMesh(bodyColor, isCop){
   var glassMat = new THREE.MeshStandardMaterial({ color:0x0a0c12, roughness:0.08, metalness:0.2 });
   var trimMat = new THREE.MeshStandardMaterial({ color:0x15161c, roughness:0.5, metalness:0.6 });
 
-  // Lower body — slightly tapered silhouette (wider at the doors than the nose/tail) for a
-  // less box-of-a-car look, built from a stack of boxes rather than one flat slab.
-  var bodyGeo = new THREE.BoxGeometry(1.9,0.5,4.0, 5,3,10); // segmented so it can dent
+  // Lower body — extends the full length of the car including what used to be separate
+  // front/rear bumper boxes, so the whole shell (the part that actually takes impacts) is
+  // one continuous soft-body mesh instead of a rigid bumper bolted onto a dentable box.
+  var bodyGeo = new THREE.BoxGeometry(1.9,0.55,4.6, 7,4,16); // dense grid so dents look like real crumples
   bodyGeo.userData.origPos = bodyGeo.attributes.position.array.slice();
   var body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.position.y = 0.5; g.add(body); g.userData.body = body;
+  body.position.y = 0.48; g.add(body); g.userData.body = body;
   var beltline = new THREE.Mesh(new THREE.BoxGeometry(1.96,0.16,3.2), bodyMat);
   beltline.position.set(0,0.78,0); g.add(beltline);
 
@@ -309,11 +318,10 @@ function buildCarMesh(bodyColor, isCop){
     mirror.position.set(side*1.0, 0.85, 0.55); g.add(mirror);
   });
 
-  // Front + rear bumpers (front is the crumple target)
-  var frontBumper = new THREE.Mesh(new THREE.BoxGeometry(1.85,0.42,0.3), bodyMat);
-  frontBumper.position.set(0,0.42,1.95); g.add(frontBumper); g.userData.frontBumper = frontBumper;
-  var rearBumper = new THREE.Mesh(new THREE.BoxGeometry(1.85,0.4,0.24), trimMat);
-  rearBumper.position.set(0,0.4,-1.95); g.add(rearBumper);
+  // Rear valance trim only — the front bumper is no longer a separate rigid mesh, it's
+  // now part of the deformable body shell above so a head-on hit actually crumples it.
+  var rearBumper = new THREE.Mesh(new THREE.BoxGeometry(1.85,0.4,0.2), trimMat);
+  rearBumper.position.set(0,0.4,-2.25); g.add(rearBumper);
 
   // Wheels with a simple rim disc so they read as more than plain cylinders
   var wheelGeo = new THREE.CylinderGeometry(0.36,0.36,0.32,12);
@@ -332,17 +340,17 @@ function buildCarMesh(bodyColor, isCop){
   // Headlights — two, one per side (previously a stray clone/reference mixup produced
   // three overlapping spheres with one side missing its own independent instance)
   var hl1 = new THREE.PointLight(0xbfe0ff, isCop?0.9:1.4, isCop?14:20);
-  hl1.position.set(0,0.6,2.2); g.add(hl1);
+  hl1.position.set(0,0.6,2.45); g.add(hl1);
   var hlGeo = new THREE.SphereGeometry(0.12,6,6);
   var hlMat = new THREE.MeshBasicMaterial({color:0xdff2ff});
   [-0.7, 0.7].forEach(function(sx){
     var hlMesh = new THREE.Mesh(hlGeo, hlMat);
-    hlMesh.position.set(sx,0.55,2.0); g.add(hlMesh);
+    hlMesh.position.set(sx,0.55,2.25); g.add(hlMesh);
   });
 
   // Taillights
   var tl = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.15,0.05), new THREE.MeshBasicMaterial({color:0xff2233}));
-  tl.position.set(0,0.55,-2.0); g.add(tl); g.userData.tail = tl;
+  tl.position.set(0,0.55,-2.28); g.add(tl); g.userData.tail = tl;
 
   if (isCop) {
     var bar = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.2,0.35), new THREE.MeshStandardMaterial({color:0x111111}));
@@ -375,7 +383,7 @@ function Car(opts){
   this.isCop = !!opts.isCop;
   this.isAI = !!opts.isAI;
   this.driftSlip = 0;      // lateral slip angle offset while drifting
-  this.radius = 2.1;
+  this.radius = 2.3; // matches the extended body length now that bumpers are part of the shell
   this.lap = 0; this.nextCP = 0; this.progress = 0;
   this.waypoints = opts.waypoints || null;
   this.wpIndex = 0;
@@ -383,7 +391,7 @@ function Car(opts){
   this.stunTimer = 0; // brief post-crash window where throttle/brake input is ignored, so the bounce-back can separate the car from what it hit
   this.busted = 0; // cop-chase capture meter
 }
-Car.prototype.forwardVec = function(){ return new THREE.Vector3(Math.sin(this.heading),0,Math.cos(this.heading)); };
+Car.prototype.forwardVec = function(){ return new THREE.Vector3(-Math.sin(this.heading),0,Math.cos(this.heading)); };
 
 var MAX_SPEED = 46, MAX_SPEED_NITRO = 66, ACCEL = 26, BRAKE_DECEL = 46, DRAG = 9, REVERSE_MAX = 16;
 var TURN_RATE = 2.6; // rad/sec at low speed
@@ -456,10 +464,6 @@ Car.prototype.updatePhysics = function(dt, input){
   } else {
     this.mesh.userData.body.material.emissive.setHex(0x000000);
   }
-  // crumple visual
-  var dmgScale = 1 - Math.min(0.4, this.damage/100*0.4);
-  this.mesh.userData.frontBumper.scale.z = dmgScale;
-  this.mesh.userData.frontBumper.position.z = 1.95*dmgScale;
 };
 
 Car.prototype.applyDamage = function(amount){
@@ -504,8 +508,11 @@ function resolveCrash(car, nx, nz, penetration, impactSpeed){
     // angular kick — more spin on glancing hits, less on dead-on
     var cross = fwd.x*nz - fwd.z*nx;
     car.angularVel += (cross>=0?1:-1) * sev * (1.2 + (1-headOn)*3.5) * (0.6+Math.random()*0.6);
-    burst(new THREE.Vector3(car.x + nx*car.radius, 0.6, car.z + nz*car.radius), 0xffaa33, 10+sev*16, 6+sev*10);
-    if (sev>0.05) deformCarBody(car, new THREE.Vector3(car.x + nx*car.radius, 0.55, car.z + nz*car.radius), nx, nz, sev);
+    // nx/nz point FROM the obstacle TOWARD the car, so the actual contact point on the car's
+    // surface is car.center MINUS that direction (toward the obstacle) — using +nx here was
+    // placing both the spark burst and the deformation on the car's far side, away from the hit.
+    burst(new THREE.Vector3(car.x - nx*car.radius, 0.6, car.z - nz*car.radius), 0xffaa33, 10+sev*16, 6+sev*10);
+    if (sev>0.05) deformCarBody(car, new THREE.Vector3(car.x - nx*car.radius, 0.55, car.z - nz*car.radius), nx, nz, sev);
     if (car.isPlayer) shakeAmt = Math.max(shakeAmt, 0.15+sev*0.6);
     if (car.isPlayer && window.__RL_DEBUG) console.log('[world-crash] pen='+penetration.toFixed(3)+' sev='+sev.toFixed(3)+' dmg='+dmg.toFixed(2)+' newSpeed='+car.speed.toFixed(2)+' pos=('+car.x.toFixed(2)+','+car.z.toFixed(2)+')');
     // Brief control lockout on a real hit so the bounce-back can actually separate
@@ -666,7 +673,7 @@ function spawnCops(n){
 // simple AI: steer toward a target point
 function aiSteerToward(car, tx, tz, dt, aggressive){
   var dx=tx-car.x, dz=tz-car.z;
-  var targetHeading = Math.atan2(dx,dz);
+  var targetHeading = Math.atan2(-dx,dz); // matches forwardVec's (-sin(h), cos(h)) convention
   var diff = targetHeading - car.heading;
   while (diff>Math.PI) diff-=Math.PI*2; while (diff<-Math.PI) diff+=Math.PI*2;
   var steer = THREE.MathUtils.clamp(diff*1.4, -1, 1);
@@ -998,6 +1005,7 @@ function animate(){
 }
 camera.position.set(startPos.x, 8, startPos.z+14);
 camera.lookAt(startPos.x,0,startPos.z);
+if (window.__RL_DEBUG) window.__RL_SCENE = { scene:scene, camera:camera, renderer:renderer, player:function(){return player;} };
 animate();
 
 })();
