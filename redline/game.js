@@ -124,24 +124,80 @@ var WINDOW_TEX_SOURCES = (function(){
   return [ bake('#ffb066',0.4), bake('#5fd6ff',0.32), bake('#ffe08a',0.28), bake('#8fd8ff',0.45) ];
 })();
 
-function addBuilding(cx, cz, w, d, h, color){
-  var geo = new THREE.BoxGeometry(w, h, d);
-  var roofMat = new THREE.MeshStandardMaterial({ color: color || 0x22242e, roughness: 0.9 });
+function windowSideMat(w, h){
   var winSrc = WINDOW_TEX_SOURCES[Math.floor(Math.random()*WINDOW_TEX_SOURCES.length)];
   var winTex = winSrc.clone(); winTex.needsUpdate = true;
-  winTex.repeat.set(Math.max(1,Math.round(w/9)), Math.max(2,Math.round(h/9)));
-  var sideMat = new THREE.MeshStandardMaterial({ map: winTex, emissiveMap: winTex, emissive: 0xffffff, emissiveIntensity: 0.55, color: 0x2a2c36, roughness: 0.8 });
-  // Box face order: +x,-x,+y(top),-y(bottom),+z,-z — sides get the window grid, roof/floor stay plain.
-  var m = new THREE.Mesh(geo, [sideMat, sideMat, roofMat, roofMat, sideMat, sideMat]);
-  m.position.set(cx, h/2, cz);
-  scene.add(m);
+  winTex.repeat.set(Math.max(1,Math.round(w/9)), Math.max(1,Math.round(h/9)));
+  return new THREE.MeshStandardMaterial({ map: winTex, emissiveMap: winTex, emissive: 0xffffff, emissiveIntensity: 0.55, color: 0x2a2c36, roughness: 0.8 });
+}
+// A single storey block: window-textured sides, plain roof/floor caps. cy is the
+// world-space Y of the block's own center (not its base), so callers stack these directly.
+function addTier(group, cx, cy, cz, w, h, d, roofMat){
+  var sideMat = windowSideMat(w, h);
+  var m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), [sideMat, sideMat, roofMat, roofMat, sideMat, sideMat]);
+  m.position.set(cx, cy, cz);
+  group.add(m);
+}
+// A protruding cornice/parapet ledge marking a setback or the podium line — the detail
+// that makes a silhouette read as an actual building rather than a stack of boxes.
+function addLedge(group, cx, cy, cz, w, d, mat){
+  var ledge = new THREE.Mesh(new THREE.BoxGeometry(w+0.7,0.4,d+0.7), mat);
+  ledge.position.set(cx,cy,cz);
+  group.add(ledge);
+}
+
+function addBuilding(cx, cz, w, d, h, color){
+  var roofMat = new THREE.MeshStandardMaterial({ color: color || 0x22242e, roughness: 0.9 });
+  var trimMat = new THREE.MeshStandardMaterial({ color: 0x0e0f16, roughness: 0.7, metalness: 0.2 });
+  var group = new THREE.Group();
+  var archetype = Math.random();
+  var footprintW = w, footprintD = d;
+
+  if (archetype < 0.28) {
+    // Slab — a clean single tower. Kept as an option so the skyline isn't uniformly busy.
+    addTier(group, 0, h/2, 0, w, h, d, roofMat);
+
+  } else if (archetype < 0.52) {
+    // Podium + setback tower: a wide low base (the street-level "podium" of a real
+    // high-rise) with a narrower, often off-center tower rising out of it.
+    var podiumH = Math.min(h*0.22, 9+Math.random()*4);
+    addTier(group, 0, podiumH/2, 0, w, podiumH, d, roofMat);
+    addLedge(group, 0, podiumH, 0, w, d, trimMat);
+    var towerW = w*(0.55+Math.random()*0.15), towerD = d*(0.55+Math.random()*0.15);
+    var offX = (w-towerW)*0.35*(Math.random()<0.5?-1:1);
+    var towerH = h-podiumH;
+    addTier(group, offX, podiumH+towerH/2, 0, towerW, towerH, towerD, roofMat);
+
+  } else if (archetype < 0.8) {
+    // Stepped setback tower: three tiers, each narrower than the last, each transition
+    // marked with a real cornice ledge — the classic 1920s-skyscraper silhouette.
+    var h1=h*0.42, h2=h*0.33, h3=h-h1-h2;
+    var w2=w*0.74, d2=d*0.74, w3=w*0.5, d3=d*0.5;
+    var y=0;
+    addTier(group, 0, y+h1/2, 0, w, h1, d, roofMat); y+=h1;
+    addLedge(group, 0, y, 0, w2, d2, trimMat);
+    addTier(group, 0, y+h2/2, 0, w2, h2, d2, roofMat); y+=h2;
+    addLedge(group, 0, y, 0, w3, d3, trimMat);
+    addTier(group, 0, y+h3/2, 0, w3, h3, d3, roofMat);
+
+  } else {
+    // Twin block: two slim towers sharing one footprint with a gap between them —
+    // breaks up the skyline rhythm so not every building is a single monolith.
+    var gap = w*0.22, halfW = (w-gap)/2;
+    addTier(group, -(halfW/2+gap/2), h/2, 0, halfW, h, d, roofMat);
+    addTier(group,  (halfW/2+gap/2), h/2, 0, halfW, h, d, roofMat);
+  }
+
+  group.position.set(cx,0,cz);
+  scene.add(group);
+
   // Rooftop clutter on taller buildings — small AC/vent blocks and an antenna, so the
   // skyline reads as a real city rather than a field of identical box tops.
   if (h > 22 && Math.random() < 0.6) {
     var acMat = new THREE.MeshStandardMaterial({ color: 0x1a1c22, roughness: 0.8 });
     for (var i=0;i<1+Math.floor(Math.random()*2);i++){
-      var ac = new THREE.Mesh(new THREE.BoxGeometry(w*0.16,1.4,w*0.16), acMat);
-      ac.position.set(cx+(Math.random()-0.5)*w*0.5, h+0.7, cz+(Math.random()-0.5)*d*0.5);
+      var ac = new THREE.Mesh(new THREE.BoxGeometry(w*0.14,1.4,w*0.14), acMat);
+      ac.position.set(cx+(Math.random()-0.5)*w*0.4, h+0.7, cz+(Math.random()-0.5)*d*0.4);
       scene.add(ac);
     }
     if (Math.random()<0.5){
@@ -151,7 +207,9 @@ function addBuilding(cx, cz, w, d, h, color){
       beacon.position.set(cx, h+5, cz); scene.add(beacon);
     }
   }
-  aabbColliders.push({ minX:cx-w/2, maxX:cx+w/2, minZ:cz-d/2, maxZ:cz+d/2, h:h });
+  // Collision uses the base footprint at full height — a simplification (the real mesh
+  // narrows higher up) but a correct and cheap one, since nothing in this game flies.
+  aabbColliders.push({ minX:cx-footprintW/2, maxX:cx+footprintW/2, minZ:cz-footprintD/2, maxZ:cz+footprintD/2, h:h });
 }
 
 function addGuardrail(x1,z1,x2,z2){
