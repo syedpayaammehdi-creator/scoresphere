@@ -51,7 +51,27 @@ try {
 
 // ── Ground ───────────────────────────────────────────────────────────────
 var WORLD_R = 900;
-var groundMat = new THREE.MeshStandardMaterial({ color: 0x0c0d16, roughness: 1 });
+function makeAsphaltTexture(){
+  var c = document.createElement('canvas'); c.width=256; c.height=256;
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#0c0d16'; ctx.fillRect(0,0,256,256);
+  for (var i=0;i<2600;i++){
+    var x=Math.random()*256, y=Math.random()*256, s=0.6+Math.random()*1.4;
+    ctx.fillStyle = 'rgba(255,255,255,'+(Math.random()*0.05).toFixed(3)+')';
+    ctx.fillRect(x,y,s,s);
+  }
+  for (var i=0;i<14;i++){
+    var x=Math.random()*256, y=Math.random()*256, r=18+Math.random()*44;
+    var g=ctx.createRadialGradient(x,y,0,x,y,r);
+    g.addColorStop(0,'rgba(0,0,0,0.18)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+  var tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(135,135);
+  return tex;
+}
+var groundMat = new THREE.MeshStandardMaterial({ map: makeAsphaltTexture(), color: 0x2a2a34, roughness: 1 });
 var ground = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_R*2.4, WORLD_R*2.4, 1, 1), groundMat);
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
@@ -79,18 +99,57 @@ function addLaneLine(cx, cz, w, l, rotY){
 var aabbColliders = []; // {minX,maxX,minZ,maxZ,h}
 var segColliders   = []; // {x1,z1,x2,z2,r}
 
+// A handful of pre-baked window-grid textures (warm and cool tints, varying lit-window
+// density) reused across buildings — cheap to draw once, cloned per-building only to
+// set an individual repeat count so the window rows line up with each tower's height.
+var WINDOW_TEX_SOURCES = (function(){
+  function bake(baseColor, litRatio){
+    var cw=48, ch=96;
+    var c = document.createElement('canvas'); c.width=cw; c.height=ch;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#0a0a10'; ctx.fillRect(0,0,cw,ch);
+    var cols=5, rows=11, padX=2, padY=2;
+    var cellW=cw/cols, cellH=ch/rows;
+    for (var r=0;r<rows;r++){
+      for (var col=0;col<cols;col++){
+        var lit = Math.random()<litRatio;
+        ctx.fillStyle = lit ? baseColor : 'rgba(255,255,255,0.05)';
+        ctx.fillRect(col*cellW+padX, r*cellH+padY, cellW-padX*2, cellH-padY*2);
+      }
+    }
+    var tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+  return [ bake('#ffb066',0.4), bake('#5fd6ff',0.32), bake('#ffe08a',0.28), bake('#8fd8ff',0.45) ];
+})();
+
 function addBuilding(cx, cz, w, d, h, color){
   var geo = new THREE.BoxGeometry(w, h, d);
-  var mat = new THREE.MeshStandardMaterial({ color: color || 0x22242e, roughness: 0.85, emissive: 0x000000 });
-  var m = new THREE.Mesh(geo, mat);
+  var roofMat = new THREE.MeshStandardMaterial({ color: color || 0x22242e, roughness: 0.9 });
+  var winSrc = WINDOW_TEX_SOURCES[Math.floor(Math.random()*WINDOW_TEX_SOURCES.length)];
+  var winTex = winSrc.clone(); winTex.needsUpdate = true;
+  winTex.repeat.set(Math.max(1,Math.round(w/9)), Math.max(2,Math.round(h/9)));
+  var sideMat = new THREE.MeshStandardMaterial({ map: winTex, emissiveMap: winTex, emissive: 0xffffff, emissiveIntensity: 0.55, color: 0x2a2c36, roughness: 0.8 });
+  // Box face order: +x,-x,+y(top),-y(bottom),+z,-z — sides get the window grid, roof/floor stay plain.
+  var m = new THREE.Mesh(geo, [sideMat, sideMat, roofMat, roofMat, sideMat, sideMat]);
   m.position.set(cx, h/2, cz);
   scene.add(m);
-  // window glow strip
-  if (Math.random() < 0.85) {
-    var gw = new THREE.Mesh(new THREE.PlaneGeometry(w*0.9, h*0.7),
-      new THREE.MeshBasicMaterial({ color: Math.random()<0.5?0xff6a3d:0x33ccff, transparent:true, opacity:0.14 }));
-    gw.position.set(cx, h/2, cz + d/2 + 0.05);
-    scene.add(gw);
+  // Rooftop clutter on taller buildings — small AC/vent blocks and an antenna, so the
+  // skyline reads as a real city rather than a field of identical box tops.
+  if (h > 22 && Math.random() < 0.6) {
+    var acMat = new THREE.MeshStandardMaterial({ color: 0x1a1c22, roughness: 0.8 });
+    for (var i=0;i<1+Math.floor(Math.random()*2);i++){
+      var ac = new THREE.Mesh(new THREE.BoxGeometry(w*0.16,1.4,w*0.16), acMat);
+      ac.position.set(cx+(Math.random()-0.5)*w*0.5, h+0.7, cz+(Math.random()-0.5)*d*0.5);
+      scene.add(ac);
+    }
+    if (Math.random()<0.5){
+      var ant = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,5,5), acMat);
+      ant.position.set(cx, h+2.5, cz); scene.add(ant);
+      var beacon = new THREE.Mesh(new THREE.SphereGeometry(0.22,6,6), new THREE.MeshBasicMaterial({color:0xff2233}));
+      beacon.position.set(cx, h+5, cz); scene.add(beacon);
+    }
   }
   aabbColliders.push({ minX:cx-w/2, maxX:cx+w/2, minZ:cz-d/2, maxZ:cz+d/2, h:h });
 }
